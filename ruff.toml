@@ -1,0 +1,58 @@
+target-version = "py310"
+line-length = 100
+indent-width = 4
+
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "libs",
+    "node_modules",
+    "venv",
+    "__pycache__",
+]
+
+[lint]
+select = [
+    "E", # pycodestyle errors
+    "W", # pycodestyle warnings
+    "F", # pyflakes
+    "B", # flake8-bugbear
+    "I", # isort
+]
+
+ignore = [
+    "E501", # line too long, handled by black
+    "B008", # do not perform function calls in argument defaults
+    "B024", # abstract class has no abstract methods
+]
+
+unfixable = [
+    "F401", # module imported but unused
+    "F841", # local variable is assigned to but never used,
+]
+
+[lint.per-file-ignores]
+"__init__.py" = ["E402", "F401"]
+"**/{tests,docs,tools}/*" = ["E402"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

@@ -1,0 +1,19 @@
+[project]
+name = "filtflow"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13.5"
+dependencies = [
+    "numpy>=2.4.4",
+    "pillow>=12.1.1",
+    "pystray>=0.19.5",
+    "sounddevice>=0.5.5",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "pyinstaller>=6.19.0",
+    "ruff>=0.15.8",
+]
