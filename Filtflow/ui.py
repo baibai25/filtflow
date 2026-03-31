@@ -50,6 +50,8 @@ from expander import (
     EXP_MIN_OUTPUT_GAIN,
     EXP_MIN_RATIO,
     EXP_MIN_THRESHOLD_DB,
+    GATE_DEFAULT_RATIO,
+    GATE_DEFAULT_RELEASE_MS,
     PRESET_EXPANDER,
     PRESET_GATE,
     Expander,
@@ -462,6 +464,19 @@ class SettingsWindow(tk.Toplevel):
         preset = self._exp_preset_var.get()
         self._expander.update_params(preset=preset)
         self._config.expander.preset = preset
+
+        # プリセットに対応するデフォルト値をスライダーとフィルタに適用する。
+        # ratio と release_ms がプリセット間で異なる（設計書 §3.2 参照）。
+        if preset == PRESET_GATE:
+            ratio: float = GATE_DEFAULT_RATIO
+            release_ms: int = GATE_DEFAULT_RELEASE_MS
+        else:
+            ratio = EXP_DEFAULT_RATIO
+            release_ms = EXP_DEFAULT_RELEASE_MS
+
+        self._exp_ratio.set(ratio)
+        self._exp_release.set(float(release_ms))
+        self._expander.update_params(ratio=ratio, release_ms=release_ms)
 
     def _on_detector_change(self, *_: object) -> None:
         detector = self._exp_detector_var.get()

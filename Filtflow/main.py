@@ -95,6 +95,9 @@ def main() -> None:
     settings_win: SettingsWindow | None = None
     tray: TrayIcon | None = None
 
+    # 終了フラグ（list で可変にして内側関数から参照する）
+    _quitting: list[bool] = [False]
+
     def open_settings() -> None:
         """トレイから設定ウィンドウを開く。tkinter スレッドセーフ呼び出し。"""
         root.after(0, _show_settings)
@@ -120,21 +123,40 @@ def main() -> None:
         root.after(0, _do_quit)
 
     def _do_quit() -> None:
+        _quitting[0] = True
         stream.stop()
         root.quit()
 
-    # --- ストリーム開始（エラー時は自動再接続ループ） ---
+    # --- ストリーム開始・再接続 ---
     def _start_stream() -> None:
+        """ストリームを起動する。失敗時は 3 秒後に再試行する。
+
+        restart() を使うことで、起動時の初回起動と
+        起動後の再接続（stream.stop() 後の再起動）の両方に対応する。
+        """
+        if _quitting[0]:
+            return
         try:
-            stream.start()
+            stream.restart()
             if tray is not None:
                 tray.set_normal_state()
         except Exception as exc:
             print(f"[Filtflow] AudioStream エラー: {exc}", file=sys.stderr)
             if tray is not None:
                 tray.set_error_state()
-            # 3 秒後に再試行
             root.after(RECONNECT_INTERVAL_MS, _start_stream)
+
+    def _watch_stream() -> None:
+        """起動後のストリーム死活を監視し、停止を検出したら再接続する。
+
+        設計書「ストリーム途切れ → 3秒後に自動再接続」に対応。
+        デバイス抜き差しや予期しない停止を拾う。
+        """
+        if _quitting[0]:
+            return
+        if not stream.is_active:
+            _start_stream()
+        root.after(RECONNECT_INTERVAL_MS, _watch_stream)
 
     # --- トレイアイコン起動 ---
     tray = TrayIcon(on_open_settings=open_settings, on_quit=quit_app)
@@ -142,6 +164,8 @@ def main() -> None:
 
     # ストリーム開始（tkinter の after で非同期に開始してメインループを先に立ち上げる）
     root.after(100, _start_stream)
+    # 死活監視ループ開始（初回起動猶予の後にスタート）
+    root.after(100 + RECONNECT_INTERVAL_MS, _watch_stream)
 
     # --- メインループ（tkinter） ---
     try:

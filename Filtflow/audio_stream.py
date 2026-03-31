@@ -126,11 +126,24 @@ class AudioStream:
                 pass
 
     def start(self) -> None:
-        """ストリームを開始する。デバイスが見つからない場合は例外を送出する。"""
+        """ストリームを開始する。デバイスが未解決の場合は RuntimeError を送出する。"""
         with self._lock:
             if self._stream is not None:
                 return
             self._error = None
+
+            # None のままでは sounddevice がシステムデフォルトにフォールバックするため、
+            # 起動前に必ず解決済みデバイスを要求する
+            if self._input_device is None:
+                self._error = "入力デバイスが見つかりません。UIから入力デバイスを選択してください。"
+                raise RuntimeError(self._error)
+            if self._output_device is None:
+                self._error = (
+                    "出力デバイスが見つかりません。"
+                    "VB-Cable がインストールされているか確認してください。"
+                )
+                raise RuntimeError(self._error)
+
             try:
                 self._stream = sd.Stream(
                     device=(self._input_device, self._output_device),
