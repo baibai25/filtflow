@@ -95,9 +95,10 @@ def main() -> None:
     settings_win: SettingsWindow | None = None
     tray: TrayIcon | None = None
 
-    # 終了フラグ・再接続中フラグ（list で可変にして内側関数から参照する）
+    # 終了フラグ・再接続中フラグ・エラーメッセージ（list で可変にして内側関数から参照する）
     _quitting: list[bool] = [False]
-    _reconnecting: list[bool] = [False]  # 再試行タイマーがすでにキューにあるか
+    _reconnecting: list[bool] = [False]   # 再試行タイマーがすでにキューにあるか
+    _stream_error: list[str | None] = [None]  # 最新のストリームエラーメッセージ
 
     def open_settings() -> None:
         """トレイから設定ウィンドウを開く。tkinter スレッドセーフ呼び出し。"""
@@ -118,6 +119,11 @@ def main() -> None:
             settings_win.deiconify()
             settings_win.lift()
             settings_win.focus_force()
+        # 未解決のストリームエラーがあれば UI にも表示する（設計書 §8）
+        if _stream_error[0] is not None:
+            settings_win.show_error(_stream_error[0])
+        else:
+            settings_win.clear_error()
 
     def quit_app() -> None:
         """アプリケーション終了。tkinter スレッドセーフ呼び出し。"""
@@ -143,12 +149,19 @@ def main() -> None:
         try:
             stream.restart()
             _reconnecting[0] = False
+            _stream_error[0] = None
             if tray is not None:
                 tray.set_normal_state()
+            if settings_win is not None and settings_win.winfo_exists():
+                settings_win.clear_error()
         except Exception as exc:
-            print(f"[Filtflow] AudioStream エラー: {exc}", file=sys.stderr)
+            msg = str(exc)
+            print(f"[Filtflow] AudioStream エラー: {msg}", file=sys.stderr)
+            _stream_error[0] = msg
             if tray is not None:
                 tray.set_error_state()
+            if settings_win is not None and settings_win.winfo_exists():
+                settings_win.show_error(msg)
             # _reconnecting[0] は True のまま保持し、次の試行が終わるまでスキップさせる
             root.after(RECONNECT_INTERVAL_MS, _start_stream)
 

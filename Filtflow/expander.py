@@ -136,8 +136,10 @@ class Expander:
             平滑化後の gain_db 値。
         """
         # ゲイン計算
+        # slope = 1 - ratio（ratio>1 で負値）
+        # 閾値以下では (threshold - env_db) が正 → gain_db は負 = 減衰
         if env_db < self._threshold:
-            target_gain_db = self._slope * (env_db - self._threshold)
+            target_gain_db = self._slope * (self._threshold - env_db)
         else:
             target_gain_db = 0.0
 
