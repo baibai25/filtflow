@@ -54,9 +54,19 @@ def find_device_index(name: str, is_input: bool = True) -> int | None:
     Returns:
         見つかった場合はデバイスインデックス、見つからない場合は None。
     """
+    # 空・空白のみは未設定とみなし None を返す（デフォルトデバイスへのフォールバックを防ぐ）
+    if not name.strip():
+        return None
+
     devices = list_input_devices() if is_input else list_output_devices()
+    name_lower = name.lower()
+
+    # 完全一致を優先してから部分一致にフォールバック
     for dev in devices:
-        if name.lower() in str(dev.get("name", "")).lower():
+        if str(dev.get("name", "")).lower() == name_lower:
+            return int(dev["index"])
+    for dev in devices:
+        if name_lower in str(dev.get("name", "")).lower():
             return int(dev["index"])
     return None
 

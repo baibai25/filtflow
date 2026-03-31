@@ -95,8 +95,9 @@ def main() -> None:
     settings_win: SettingsWindow | None = None
     tray: TrayIcon | None = None
 
-    # 終了フラグ（list で可変にして内側関数から参照する）
+    # 終了フラグ・再接続中フラグ（list で可変にして内側関数から参照する）
     _quitting: list[bool] = [False]
+    _reconnecting: list[bool] = [False]  # 再試行タイマーがすでにキューにあるか
 
     def open_settings() -> None:
         """トレイから設定ウィンドウを開く。tkinter スレッドセーフ呼び出し。"""
@@ -133,28 +134,33 @@ def main() -> None:
 
         restart() を使うことで、起動時の初回起動と
         起動後の再接続（stream.stop() 後の再起動）の両方に対応する。
+        _reconnecting フラグで再試行タイマーを 1 本に限定し、
+        多重スタックを防ぐ。
         """
         if _quitting[0]:
             return
+        _reconnecting[0] = True
         try:
             stream.restart()
+            _reconnecting[0] = False
             if tray is not None:
                 tray.set_normal_state()
         except Exception as exc:
             print(f"[Filtflow] AudioStream エラー: {exc}", file=sys.stderr)
             if tray is not None:
                 tray.set_error_state()
+            # _reconnecting[0] は True のまま保持し、次の試行が終わるまでスキップさせる
             root.after(RECONNECT_INTERVAL_MS, _start_stream)
 
     def _watch_stream() -> None:
         """起動後のストリーム死活を監視し、停止を検出したら再接続する。
 
         設計書「ストリーム途切れ → 3秒後に自動再接続」に対応。
-        デバイス抜き差しや予期しない停止を拾う。
+        _reconnecting が True の間はスキップして再試行タイマーの多重スタックを防ぐ。
         """
         if _quitting[0]:
             return
-        if not stream.is_active:
+        if not stream.is_active and not _reconnecting[0]:
             _start_stream()
         root.after(RECONNECT_INTERVAL_MS, _watch_stream)
 
