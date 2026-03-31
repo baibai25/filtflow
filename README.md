@@ -13,16 +13,14 @@
 ## セットアップ
 
 ```bash
-cd Filtflow
-
 # 依存ライブラリインストール
-pip install -r requirements.txt
+uv sync
 
 # アイコン生成（初回のみ）
-cd assets && python create_icons.py && cd ..
+cd Filtflow/assets && uv run python create_icons.py && cd ../..
 
 # 起動
-python main.py
+uv run python Filtflow/main.py
 ```
 
 起動するとウィンドウは表示されずタスクトレイにアイコンが常駐する。
@@ -116,13 +114,12 @@ Filtflow/
 ## exe ビルド
 
 ```bash
-pip install pyinstaller
-
 # アイコンが未生成の場合
-cd assets && python create_icons.py && cd ..
+cd Filtflow/assets && uv run python create_icons.py && cd ../..
 
-pyinstaller filtflow.spec
-# → dist/Filtflow.exe
+cd Filtflow
+uv run pyinstaller filtflow.spec
+# → Filtflow/dist/Filtflow.exe
 ```
 
 `console=False` でコンソールウィンドウは表示されない。
@@ -145,6 +142,8 @@ pyinstaller filtflow.spec
 | pystray | タスクトレイ常駐 |
 | Pillow | トレイアイコン画像処理 |
 | tkinter | 設定 UI（Python 標準ライブラリ） |
+
+依存関係は `pyproject.toml` で管理し、`uv` で解決する。
 
 ## ライセンス
 
