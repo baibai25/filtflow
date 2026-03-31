@@ -18,6 +18,8 @@ import sys
 import tkinter as tk
 from typing import Callable
 
+import numpy as np
+
 from audio_stream import AudioStream, find_device_index
 from compressor import Compressor
 from config import Config
@@ -33,17 +35,11 @@ RECONNECT_INTERVAL_MS: int = 3000
 
 
 def _build_filter_chain(
-    config: Config,
     compressor: Compressor,
     expander: Expander,
-) -> list[Callable[[object], object]]:
-    """有効なフィルタのみを含むチェーンリストを返す。"""
-    chain: list[Callable[[object], object]] = []
-    if config.compressor.enabled:
-        chain.append(compressor.process)  # type: ignore[arg-type]
-    if config.expander.enabled:
-        chain.append(expander.process)  # type: ignore[arg-type]
-    return chain
+) -> list[Callable[[np.ndarray], np.ndarray]]:
+    """両フィルタを常にチェーンに含める。有効/無効は各フィルタの enabled フラグで制御する。"""
+    return [compressor.process, expander.process]
 
 
 def main() -> None:
@@ -58,6 +54,7 @@ def main() -> None:
         release_ms=config.compressor.release_ms,
         output_gain_db=config.compressor.output_gain_db,
         sample_rate=config.sample_rate,
+        enabled=config.compressor.enabled,
     )
     expander = Expander(
         preset=config.expander.preset,
@@ -68,6 +65,7 @@ def main() -> None:
         output_gain_db=config.expander.output_gain_db,
         detector=config.expander.detector,
         sample_rate=config.sample_rate,
+        enabled=config.expander.enabled,
     )
 
     # --- レベルメーターキュー ---
@@ -77,12 +75,12 @@ def main() -> None:
     in_idx = find_device_index(config.input_device_name, is_input=True)
     out_idx = find_device_index(config.output_device_name, is_input=False)
 
-    filter_chain = _build_filter_chain(config, compressor, expander)
+    filter_chain = _build_filter_chain(compressor, expander)
 
     stream = AudioStream(
         input_device=in_idx,
         output_device=out_idx,
-        filter_chain=filter_chain,  # type: ignore[arg-type]
+        filter_chain=filter_chain,
         sample_rate=config.sample_rate,
         block_size=config.block_size,
         level_queue=level_queue,

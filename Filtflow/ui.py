@@ -449,11 +449,14 @@ class SettingsWindow(tk.Toplevel):
             self.show_error(f"デバイスエラー: {exc}")
 
     def _on_comp_enabled_change(self) -> None:
-        self._config.compressor.enabled = self._comp_enabled.get()
-        # filter_chain の更新は main.py 側で行う（ここでは config のみ更新）
+        enabled = self._comp_enabled.get()
+        self._config.compressor.enabled = enabled
+        self._compressor.enabled = enabled
 
     def _on_exp_enabled_change(self) -> None:
-        self._config.expander.enabled = self._exp_enabled.get()
+        enabled = self._exp_enabled.get()
+        self._config.expander.enabled = enabled
+        self._expander.enabled = enabled
 
     def _on_preset_change(self, *_: object) -> None:
         preset = self._exp_preset_var.get()

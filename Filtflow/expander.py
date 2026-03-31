@@ -72,8 +72,10 @@ class Expander:
         output_gain_db: float,
         detector: str,
         sample_rate: int,
+        enabled: bool = True,
     ) -> None:
         self._sample_rate = sample_rate
+        self.enabled: bool = enabled
         self._preset = preset
         self._detector = detector
 
@@ -162,8 +164,11 @@ class Expander:
             frame: shape (block_size, channels) の float32 配列。
 
         Returns:
-            同 shape の処理済み配列。
+            同 shape の処理済み配列。enabled=False のときは入力をそのまま返す。
         """
+        if not self.enabled:
+            return frame
+
         shape = frame.shape
         samples = frame.flatten()
         out = np.empty_like(samples)

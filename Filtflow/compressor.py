@@ -56,8 +56,10 @@ class Compressor:
         release_ms: int,
         output_gain_db: float,
         sample_rate: int,
+        enabled: bool = True,
     ) -> None:
         self._sample_rate = sample_rate
+        self.enabled: bool = enabled
         # エンベロープ検出器の状態変数
         self._envelope: float = 0.0
 
@@ -92,8 +94,11 @@ class Compressor:
             frame: shape (block_size, channels) の float32 配列。
 
         Returns:
-            同 shape の処理済み配列。
+            同 shape の処理済み配列。enabled=False のときは入力をそのまま返す。
         """
+        if not self.enabled:
+            return frame
+
         shape = frame.shape
         samples = frame.flatten()
         out = np.empty_like(samples)

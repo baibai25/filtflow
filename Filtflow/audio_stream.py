@@ -26,16 +26,10 @@ def list_devices() -> list[dict[str, Any]]:
         sounddevice のデバイス情報 dict のリスト。
         各要素は "index", "name", "max_input_channels", "max_output_channels" を含む。
     """
-    raw = sd.query_devices()
     result: list[dict[str, Any]] = []
-    if isinstance(raw, sd.DeviceList):
-        for idx, dev in enumerate(raw):
-            d = dict(dev)
-            d["index"] = idx
-            result.append(d)
-    else:
-        d = dict(raw)  # type: ignore[arg-type]
-        d["index"] = 0
+    for idx, dev in enumerate(sd.query_devices()):
+        d = dict(dev)  # type: ignore[arg-type]
+        d["index"] = idx
         result.append(d)
     return result
 
