@@ -77,6 +77,10 @@ METER_MAX_DB: float = 0.0
 METER_UPDATE_MS: int = 30
 PEAK_HOLD_SEC: float = 2.0
 
+METER_BAR_HEIGHT: int = 12
+METER_SCALE_HEIGHT: int = 22
+METER_TICK_MARKS: list[float] = [-60.0, -50.0, -40.0, -30.0, -20.0, -10.0, 0.0]
+
 BLOCK_SIZE_OPTIONS: list[str] = ["128", "256", "480", "512", "960", "1024"]
 
 
@@ -112,10 +116,11 @@ class LevelMeter(ctk.CTkFrame):
         self._label_db.pack(side="right")
 
         canvas_bg = self._get_canvas_bg()
+        self._last_scale: float = self._get_widget_scaling()
 
         self._canvas = tk.Canvas(
             self,
-            height=16,
+            height=round((METER_BAR_HEIGHT + METER_SCALE_HEIGHT) * self._last_scale),
             highlightthickness=0,
             bd=0,
             relief="flat",
@@ -128,8 +133,8 @@ class LevelMeter(ctk.CTkFrame):
         self._update()
 
     def _get_canvas_bg(self) -> str:
-        """親カードの現在の色に合わせた Canvas 背景色を返す。"""
-        fg_color = self.master.cget("fg_color")
+        """LevelMeter フレーム自身の色に合わせた Canvas 背景色を返す。"""
+        fg_color = self.cget("fg_color")
         applied = self._apply_appearance_mode(fg_color)
         if isinstance(applied, (tuple, list)):
             return str(applied[0])
@@ -139,7 +144,7 @@ class LevelMeter(ctk.CTkFrame):
         """dB 値をキャンバス上の x 座標に変換する。"""
         clamped = max(METER_MIN_DB, min(METER_MAX_DB, db))
         ratio = (clamped - METER_MIN_DB) / (METER_MAX_DB - METER_MIN_DB)
-        return int(ratio * width)
+        return min(int(ratio * width), width - 1)
 
     def _update(self) -> None:
         """30ms ごとにキューを読み出してメーターを再描画する。"""
@@ -170,9 +175,20 @@ class LevelMeter(ctk.CTkFrame):
         self._canvas.delete("all")
 
         w = self._canvas.winfo_width()
-        h = self._canvas.winfo_height()
-        if w <= 1 or h <= 1:
+        if w <= 1:
             return
+
+        # winfo_height() は tk.Canvas の固定 height を返すだけで DPI 変化を検出できない。
+        # CTk の _get_widget_scaling() で現在の DPI スケール係数を取得して全 y 座標を決定する。
+        scale = self._get_widget_scaling()
+        if scale != self._last_scale:
+            self._last_scale = scale
+            self._canvas.configure(height=round((METER_BAR_HEIGHT + METER_SCALE_HEIGHT) * scale))
+
+        bar_h = round(METER_BAR_HEIGHT * scale)
+        tick_top = round((METER_BAR_HEIGHT + 2) * scale)
+        tick_bot = round((METER_BAR_HEIGHT + 6) * scale)
+        label_y = round((METER_BAR_HEIGHT + 7) * scale)
 
         x_green = self._db_to_x(METER_GREEN_MAX_DB, w)
         x_yellow = self._db_to_x(METER_YELLOW_MAX_DB, w)
@@ -180,24 +196,24 @@ class LevelMeter(ctk.CTkFrame):
         x_peak = self._db_to_x(self._peak_db, w)
 
         # --- 背景帯 ---
-        self._canvas.create_rectangle(0, 0, x_green, h, fill=COLOR_BG_GREEN, outline="")
-        self._canvas.create_rectangle(x_green, 0, x_yellow, h, fill=COLOR_BG_YELLOW, outline="")
-        self._canvas.create_rectangle(x_yellow, 0, w, h, fill=COLOR_BG_RED, outline="")
+        self._canvas.create_rectangle(0, 0, x_green, bar_h, fill=COLOR_BG_GREEN, outline="")
+        self._canvas.create_rectangle(x_green, 0, x_yellow, bar_h, fill=COLOR_BG_YELLOW, outline="")
+        self._canvas.create_rectangle(x_yellow, 0, w, bar_h, fill=COLOR_BG_RED, outline="")
 
         # --- アクティブレベル ---
         end_green = min(x_level, x_green)
         if end_green > 0:
-            self._canvas.create_rectangle(0, 0, end_green, h, fill=COLOR_GREEN, outline="")
+            self._canvas.create_rectangle(0, 0, end_green, bar_h, fill=COLOR_GREEN, outline="")
 
         if x_level > x_green:
             end_yellow = min(x_level, x_yellow)
             if end_yellow > x_green:
                 self._canvas.create_rectangle(
-                    x_green, 0, end_yellow, h, fill=COLOR_YELLOW, outline=""
+                    x_green, 0, end_yellow, bar_h, fill=COLOR_YELLOW, outline=""
                 )
 
         if x_level > x_yellow:
-            self._canvas.create_rectangle(x_yellow, 0, x_level, h, fill=COLOR_RED, outline="")
+            self._canvas.create_rectangle(x_yellow, 0, x_level, bar_h, fill=COLOR_RED, outline="")
 
         # --- ピーク線 ---
         if 0 < x_peak < w:
@@ -208,7 +224,22 @@ class LevelMeter(ctk.CTkFrame):
                 if self._peak_db > METER_GREEN_MAX_DB
                 else COLOR_GREEN
             )
-            self._canvas.create_line(x_peak, 0, x_peak, h, fill=peak_color, width=2)
+            self._canvas.create_line(x_peak, 0, x_peak, bar_h, fill=peak_color, width=2)
+
+        # --- 目盛り ---
+        for db in METER_TICK_MARKS:
+            x = self._db_to_x(db, w)
+            self._canvas.create_line(x, tick_top, x, tick_bot, fill="gray60", width=1)
+            label = "0" if db == 0.0 else str(int(db))
+            if db == METER_MIN_DB:
+                anchor = "nw"
+            elif db == METER_MAX_DB:
+                anchor = "ne"
+            else:
+                anchor = "n"
+            self._canvas.create_text(
+                x, label_y, text=label, fill="gray60", font=("TkDefaultFont", 8), anchor=anchor
+            )
 
 
 class _SliderRow(ctk.CTkFrame):
@@ -307,9 +338,10 @@ class SettingsWindow(ctk.CTkToplevel):
         self._level_meter_card: ctk.CTkFrame | None = None
         self._level_queue: queue.Queue[float] = level_queue
 
-        self.title("Filtflow 設定")
+        self.title("Filtflow Settings")
         self.resizable(False, True)
-        self.minsize(560, 400)
+        self.minsize(600, 400)
+        self.geometry("600x880")
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
 
         self._build_ui(level_queue)
@@ -319,18 +351,18 @@ class SettingsWindow(ctk.CTkToplevel):
         scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
         scroll.pack(fill="both", expand=True, padx=4, pady=4)
 
-        # --- レベルメーター ---
-        meter_card = _section_frame(scroll, "レベルメーター")
+        # --- Level Meter ---
+        meter_card = _section_frame(scroll, "Level Meter")
         self._level_meter_card = meter_card
         self._level_meter = LevelMeter(meter_card, self._level_queue)
         self._level_meter.pack(fill="x", padx=6, pady=(0, 6))
 
-        # --- デバイス設定 ---
-        dev_card = _section_frame(scroll, "デバイス設定")
+        # --- Device ---
+        dev_card = _section_frame(scroll, "Device")
         dev_grid = ctk.CTkFrame(dev_card, fg_color="transparent")
         dev_grid.pack(fill="x", padx=6, pady=(0, 8))
 
-        ctk.CTkLabel(dev_grid, text="入力デバイス:", anchor="w", width=110).grid(
+        ctk.CTkLabel(dev_grid, text="Input Device:", anchor="w", width=110).grid(
             row=0, column=0, sticky="w", padx=4, pady=3
         )
         self._input_var = tk.StringVar(value=self._config.input_device_name)
@@ -344,7 +376,7 @@ class SettingsWindow(ctk.CTkToplevel):
         )
         self._input_combo.grid(row=0, column=1, columnspan=2, padx=4, pady=3, sticky="w")
 
-        ctk.CTkLabel(dev_grid, text="出力デバイス:", anchor="w", width=110).grid(
+        ctk.CTkLabel(dev_grid, text="Output Device:", anchor="w", width=110).grid(
             row=1, column=0, sticky="w", padx=4, pady=3
         )
         self._output_var = tk.StringVar(value=self._config.output_device_name)
@@ -358,7 +390,7 @@ class SettingsWindow(ctk.CTkToplevel):
         )
         self._output_combo.grid(row=1, column=1, columnspan=2, padx=4, pady=3, sticky="w")
 
-        ctk.CTkLabel(dev_grid, text="ブロックサイズ:", anchor="w", width=110).grid(
+        ctk.CTkLabel(dev_grid, text="Block Size:", anchor="w", width=110).grid(
             row=2, column=0, sticky="w", padx=4, pady=3
         )
         self._block_size_var = tk.StringVar(value=str(self._config.block_size))
@@ -383,7 +415,7 @@ class SettingsWindow(ctk.CTkToplevel):
         self._comp_enabled = tk.BooleanVar(value=self._config.compressor.enabled)
         ctk.CTkCheckBox(
             comp_top,
-            text="有効",
+            text="Enable",
             variable=self._comp_enabled,
             command=self._on_comp_enabled_change,
         ).pack(anchor="e")
@@ -456,7 +488,7 @@ class SettingsWindow(ctk.CTkToplevel):
         self._exp_enabled = tk.BooleanVar(value=self._config.expander.enabled)
         ctk.CTkCheckBox(
             exp_top,
-            text="有効",
+            text="Enable",
             variable=self._exp_enabled,
             command=self._on_exp_enabled_change,
         ).pack(anchor="e")
@@ -552,7 +584,7 @@ class SettingsWindow(ctk.CTkToplevel):
         btn_frame.pack(fill="x", padx=8, pady=4)
         ctk.CTkButton(
             btn_frame,
-            text="デフォルトに戻す",
+            text="Defaults",
             width=140,
             fg_color="gray30",
             hover_color="gray40",
@@ -613,7 +645,7 @@ class SettingsWindow(ctk.CTkToplevel):
             self._config.output_device_name = out_name
             self.clear_error()
         except Exception as exc:
-            self.show_error(f"デバイスエラー: {exc}")
+            self.show_error(f"Device error: {exc}")
         self._schedule_save()
 
     def _on_block_size_change(self) -> None:
@@ -623,7 +655,7 @@ class SettingsWindow(ctk.CTkToplevel):
             self._stream.update_block_size(block_size)
             self.clear_error()
         except Exception as exc:
-            self.show_error(f"デバイスエラー: {exc}")
+            self.show_error(f"Device error: {exc}")
         self._schedule_save()
 
     def _on_comp_enabled_change(self) -> None:
@@ -702,7 +734,7 @@ class SettingsWindow(ctk.CTkToplevel):
             self._config.save()
             self.clear_error()
         except Exception as exc:
-            self.show_error(f"保存エラー: {exc}")
+            self.show_error(f"Save error: {exc}")
 
     def _on_reset(self) -> None:
         """OBS デフォルト値を UI とフィルタに適用する。"""
