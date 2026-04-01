@@ -44,6 +44,7 @@ class Config:
     output_device_name: str = "CABLE Input (VB-Audio Virtual Cable)"
     sample_rate: int = 48000
     block_size: int = 480
+    appearance_mode: str = "dark"
     compressor: CompressorConfig = field(default_factory=CompressorConfig)
     expander: ExpanderConfig = field(default_factory=ExpanderConfig)
 
@@ -69,6 +70,7 @@ class Config:
         )
         cfg.sample_rate = int(data.get("sample_rate", 48000))
         cfg.block_size = int(data.get("block_size", 480))
+        cfg.appearance_mode = str(data.get("appearance_mode", "dark"))
 
         comp = data.get("compressor", {})
         if isinstance(comp, dict):

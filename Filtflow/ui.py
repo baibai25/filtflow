@@ -58,7 +58,6 @@ from expander import (
     Expander,
 )
 
-ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 # --- OBS 準拠レベルメーターの色しきい値 ---
@@ -68,6 +67,11 @@ METER_YELLOW_MAX_DB: float = -9.0  # -20 〜 -9 dBFS:  黄
 COLOR_GREEN: str = "#00cc00"
 COLOR_YELLOW: str = "#ffff00"
 COLOR_RED: str = "#ff0000"
+# OBS スタイルメーター：非アクティブ帯のdim カラー
+DIM_GREEN: str = "#004000"
+DIM_YELLOW: str = "#404000"
+DIM_RED: str = "#400000"
+METER_CANVAS_BG: str = "#111111"
 
 METER_MIN_DB: float = -60.0
 METER_MAX_DB: float = 0.0
@@ -103,7 +107,7 @@ class LevelMeter(ctk.CTkFrame):
         self._label_db.pack(side="right")
 
         # キャンバス（メーターバー）
-        self._canvas = tk.Canvas(self, height=16, bg="#2b2b2b", highlightthickness=0)
+        self._canvas = tk.Canvas(self, height=16, bg=METER_CANVAS_BG, highlightthickness=0)
         self._canvas.pack(fill="x", padx=4, pady=(2, 6))
 
         self._update()
@@ -151,6 +155,12 @@ class LevelMeter(ctk.CTkFrame):
         x_level = self._db_to_x(self._level_db, w)
         x_peak = self._db_to_x(self._peak_db, w)
 
+        # --- 背景：OBS スタイルの dim カラーゾーン（全幅） ---
+        self._canvas.create_rectangle(0, 0, x_green, h, fill=DIM_GREEN, outline="")
+        self._canvas.create_rectangle(x_green, 0, x_yellow, h, fill=DIM_YELLOW, outline="")
+        self._canvas.create_rectangle(x_yellow, 0, w, h, fill=DIM_RED, outline="")
+
+        # --- アクティブレベルを上書き ---
         end_green = min(x_level, x_green)
         if end_green > 0:
             self._canvas.create_rectangle(0, 0, end_green, h, fill=COLOR_GREEN, outline="")
@@ -162,6 +172,7 @@ class LevelMeter(ctk.CTkFrame):
         if x_level > x_yellow:
             self._canvas.create_rectangle(x_yellow, 0, x_level, h, fill=COLOR_RED, outline="")
 
+        # --- ピーク線 ---
         if 0 < x_peak < w:
             peak_color = (
                 COLOR_RED
@@ -517,6 +528,15 @@ class SettingsWindow(ctk.CTkToplevel):
             command=self._on_reset,
         ).pack(side="left", padx=4)
 
+        self._appearance_btn = ctk.CTkSegmentedButton(
+            btn_frame,
+            values=["Dark", "Light"],
+            command=self._on_appearance_change,
+            width=140,
+        )
+        self._appearance_btn.set(self._config.appearance_mode.capitalize())
+        self._appearance_btn.pack(side="right", padx=4)
+
         # --- エラー表示ラベル ---
         self._error_label = ctk.CTkLabel(scroll, text="", text_color="#ff6666")
         self._error_label.pack(fill="x", padx=8, pady=(0, 4))
@@ -592,6 +612,14 @@ class SettingsWindow(ctk.CTkToplevel):
         detector = self._exp_detector_var.get()
         self._expander.update_params(detector=detector)
         self._config.expander.detector = detector
+
+    def _on_appearance_change(self, mode: str) -> None:
+        ctk.set_appearance_mode(mode)
+        self._config.appearance_mode = mode.lower()
+        try:
+            self._config.save()
+        except Exception:
+            pass
 
     def _on_save(self) -> None:
         """現在の UI 値を config に反映して JSON 保存する。"""

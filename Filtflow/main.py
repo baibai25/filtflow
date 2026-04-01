@@ -44,6 +44,7 @@ def _build_filter_chain(
 def main() -> None:
     # --- 設定ロード ---
     config = Config.load()
+    ctk.set_appearance_mode(config.appearance_mode)
 
     # --- フィルタ初期化 ---
     compressor = Compressor(
