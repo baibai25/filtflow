@@ -97,6 +97,7 @@ class LevelMeter(ctk.CTkFrame):
         self._peak_db: float = METER_MIN_DB
         self._peak_counter: int = 0
         self._peak_hold_frames: int = int(PEAK_HOLD_SEC * 1000 / METER_UPDATE_MS)
+        self._after_id: str | None = None
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=4, pady=(4, 0))
@@ -169,7 +170,13 @@ class LevelMeter(ctk.CTkFrame):
         self._draw_meter()
         self._label_db.configure(text=f"{self._level_db:+.1f} dB")
         self._label_peak.configure(text=f"peak: {self._peak_db:+.1f} dB")
-        self.after(METER_UPDATE_MS, self._update)
+        self._after_id = self.after(METER_UPDATE_MS, self._update)
+
+    def destroy(self) -> None:
+        if self._after_id is not None:
+            self.after_cancel(self._after_id)
+            self._after_id = None
+        super().destroy()
 
     def _draw_meter(self) -> None:
         self._canvas.delete("all")
@@ -650,9 +657,9 @@ class SettingsWindow(ctk.CTkToplevel):
 
     def _on_block_size_change(self) -> None:
         block_size = int(self._block_size_var.get())
-        self._config.block_size = block_size
         try:
             self._stream.update_block_size(block_size)
+            self._config.block_size = block_size
             self.clear_error()
         except Exception as exc:
             self.show_error(f"Device error: {exc}")
@@ -732,7 +739,6 @@ class SettingsWindow(ctk.CTkToplevel):
 
         try:
             self._config.save()
-            self.clear_error()
         except Exception as exc:
             self.show_error(f"Save error: {exc}")
 
