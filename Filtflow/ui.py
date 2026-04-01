@@ -76,7 +76,6 @@ METER_MIN_DB: float = -60.0
 METER_MAX_DB: float = 0.0
 METER_UPDATE_MS: int = 30
 PEAK_HOLD_SEC: float = 2.0
-DPI_SCALE_APPLY_DEBOUNCE_MS: int = 120
 
 METER_BAR_HEIGHT: int = 12
 METER_SCALE_HEIGHT: int = 22
@@ -99,9 +98,7 @@ class LevelMeter(ctk.CTkFrame):
         self._peak_counter: int = 0
         self._peak_hold_frames: int = int(PEAK_HOLD_SEC * 1000 / METER_UPDATE_MS)
         self._after_id: str | None = None
-        self._scale_apply_after_id: str | None = None
-        self._stable_scale: float = self._get_widget_scaling()
-        self._pending_scale: float | None = None
+        self._canvas_width: int = 0
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=4, pady=(4, 0))
@@ -121,11 +118,10 @@ class LevelMeter(ctk.CTkFrame):
         self._label_db.pack(side="right")
 
         canvas_bg = self._get_canvas_bg()
-        self._last_scale: float = self._stable_scale
 
         self._canvas = tk.Canvas(
             self,
-            height=round((METER_BAR_HEIGHT + METER_SCALE_HEIGHT) * self._last_scale),
+            height=METER_BAR_HEIGHT + METER_SCALE_HEIGHT,
             highlightthickness=0,
             bd=0,
             relief="flat",
@@ -134,6 +130,12 @@ class LevelMeter(ctk.CTkFrame):
             highlightcolor=canvas_bg,
         )
         self._canvas.pack(fill="x", padx=4, pady=(2, 6))
+        self._canvas.bind("<Configure>", self._on_canvas_configure)
+
+        self._active_green_id: int | None = None
+        self._active_yellow_id: int | None = None
+        self._active_red_id: int | None = None
+        self._peak_id: int | None = None
 
         self._update()
 
@@ -180,87 +182,32 @@ class LevelMeter(ctk.CTkFrame):
         if self._after_id is not None:
             self.after_cancel(self._after_id)
             self._after_id = None
-        if self._scale_apply_after_id is not None:
-            self.after_cancel(self._scale_apply_after_id)
-            self._scale_apply_after_id = None
         super().destroy()
 
-    def _apply_pending_scale(self) -> None:
-        self._scale_apply_after_id = None
-        if self._pending_scale is None:
+    def _on_canvas_configure(self, _event: tk.Event) -> None:
+        width = self._canvas.winfo_width()
+        if width <= 1 or width == self._canvas_width:
             return
+        self._canvas_width = width
+        self._rebuild_canvas()
 
-        self._stable_scale = self._pending_scale
-        self._pending_scale = None
-
-    def _schedule_scale_apply(self, next_scale: float) -> None:
-        self._pending_scale = next_scale
-        if self._scale_apply_after_id is not None:
-            self.after_cancel(self._scale_apply_after_id)
-        self._scale_apply_after_id = self.after(
-            DPI_SCALE_APPLY_DEBOUNCE_MS, self._apply_pending_scale
-        )
-
-    def _draw_meter(self) -> None:
-        self._canvas.delete("all")
-
-        w = self._canvas.winfo_width()
+    def _rebuild_canvas(self) -> None:
+        w = self._canvas_width
         if w <= 1:
             return
 
-        # winfo_height() は tk.Canvas の固定 height を返すだけで DPI 変化を検出できない。
-        # CTk の _get_widget_scaling() で現在の DPI スケール係数を取得して全 y 座標を決定する。
-        current_scale = self._get_widget_scaling()
-        if abs(current_scale - self._stable_scale) > 1e-3:
-            self._schedule_scale_apply(current_scale)
-
-        scale = self._stable_scale
-        if scale != self._last_scale:
-            self._last_scale = scale
-            self._canvas.configure(height=round((METER_BAR_HEIGHT + METER_SCALE_HEIGHT) * scale))
-
-        bar_h = round(METER_BAR_HEIGHT * scale)
-        tick_top = round((METER_BAR_HEIGHT + 2) * scale)
-        tick_bot = round((METER_BAR_HEIGHT + 6) * scale)
-        label_y = round((METER_BAR_HEIGHT + 7) * scale)
-
+        bar_h = METER_BAR_HEIGHT
+        tick_top = METER_BAR_HEIGHT + 2
+        tick_bot = METER_BAR_HEIGHT + 6
+        label_y = METER_BAR_HEIGHT + 7
         x_green = self._db_to_x(METER_GREEN_MAX_DB, w)
         x_yellow = self._db_to_x(METER_YELLOW_MAX_DB, w)
-        x_level = self._db_to_x(self._level_db, w)
-        x_peak = self._db_to_x(self._peak_db, w)
 
-        # --- 背景帯 ---
+        self._canvas.delete("all")
         self._canvas.create_rectangle(0, 0, x_green, bar_h, fill=COLOR_BG_GREEN, outline="")
         self._canvas.create_rectangle(x_green, 0, x_yellow, bar_h, fill=COLOR_BG_YELLOW, outline="")
         self._canvas.create_rectangle(x_yellow, 0, w, bar_h, fill=COLOR_BG_RED, outline="")
 
-        # --- アクティブレベル ---
-        end_green = min(x_level, x_green)
-        if end_green > 0:
-            self._canvas.create_rectangle(0, 0, end_green, bar_h, fill=COLOR_GREEN, outline="")
-
-        if x_level > x_green:
-            end_yellow = min(x_level, x_yellow)
-            if end_yellow > x_green:
-                self._canvas.create_rectangle(
-                    x_green, 0, end_yellow, bar_h, fill=COLOR_YELLOW, outline=""
-                )
-
-        if x_level > x_yellow:
-            self._canvas.create_rectangle(x_yellow, 0, x_level, bar_h, fill=COLOR_RED, outline="")
-
-        # --- ピーク線 ---
-        if 0 < x_peak < w:
-            peak_color = (
-                COLOR_RED
-                if self._peak_db > METER_YELLOW_MAX_DB
-                else COLOR_YELLOW
-                if self._peak_db > METER_GREEN_MAX_DB
-                else COLOR_GREEN
-            )
-            self._canvas.create_line(x_peak, 0, x_peak, bar_h, fill=peak_color, width=2)
-
-        # --- 目盛り ---
         for db in METER_TICK_MARKS:
             x = self._db_to_x(db, w)
             self._canvas.create_line(x, tick_top, x, tick_bot, fill="gray60", width=1)
@@ -274,6 +221,58 @@ class LevelMeter(ctk.CTkFrame):
             self._canvas.create_text(
                 x, label_y, text=label, fill="gray60", font=("TkDefaultFont", 8), anchor=anchor
             )
+
+        self._active_green_id = self._canvas.create_rectangle(0, 0, 0, bar_h, fill=COLOR_GREEN, outline="")
+        self._active_yellow_id = self._canvas.create_rectangle(
+            x_green, 0, x_green, bar_h, fill=COLOR_YELLOW, outline=""
+        )
+        self._active_red_id = self._canvas.create_rectangle(
+            x_yellow, 0, x_yellow, bar_h, fill=COLOR_RED, outline=""
+        )
+        self._peak_id = self._canvas.create_line(0, 0, 0, bar_h, fill=COLOR_GREEN, width=2)
+
+    def _draw_meter(self) -> None:
+        w = self._canvas_width or self._canvas.winfo_width()
+        if w <= 1:
+            return
+        if self._active_green_id is None:
+            self._canvas_width = w
+            self._rebuild_canvas()
+            if self._active_green_id is None:
+                return
+        bar_h = METER_BAR_HEIGHT
+
+        x_green = self._db_to_x(METER_GREEN_MAX_DB, w)
+        x_yellow = self._db_to_x(METER_YELLOW_MAX_DB, w)
+        x_level = self._db_to_x(self._level_db, w)
+        x_peak = self._db_to_x(self._peak_db, w)
+
+        end_green = min(x_level, x_green)
+        self._canvas.coords(self._active_green_id, 0, 0, max(end_green, 0), bar_h)
+
+        if x_level > x_green:
+            end_yellow = min(x_level, x_yellow)
+            self._canvas.coords(self._active_yellow_id, x_green, 0, max(end_yellow, x_green), bar_h)
+        else:
+            self._canvas.coords(self._active_yellow_id, x_green, 0, x_green, bar_h)
+
+        if x_level > x_yellow:
+            self._canvas.coords(self._active_red_id, x_yellow, 0, x_level, bar_h)
+        else:
+            self._canvas.coords(self._active_red_id, x_yellow, 0, x_yellow, bar_h)
+
+        if 0 < x_peak < w:
+            peak_color = (
+                COLOR_RED
+                if self._peak_db > METER_YELLOW_MAX_DB
+                else COLOR_YELLOW
+                if self._peak_db > METER_GREEN_MAX_DB
+                else COLOR_GREEN
+            )
+            self._canvas.coords(self._peak_id, x_peak, 0, x_peak, bar_h)
+            self._canvas.itemconfigure(self._peak_id, fill=peak_color, state="normal")
+        else:
+            self._canvas.itemconfigure(self._peak_id, state="hidden")
 
 
 class _SliderRow(ctk.CTkFrame):
