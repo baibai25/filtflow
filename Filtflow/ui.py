@@ -76,6 +76,7 @@ METER_MIN_DB: float = -60.0
 METER_MAX_DB: float = 0.0
 METER_UPDATE_MS: int = 30
 PEAK_HOLD_SEC: float = 2.0
+DPI_SCALE_APPLY_DEBOUNCE_MS: int = 120
 
 METER_BAR_HEIGHT: int = 12
 METER_SCALE_HEIGHT: int = 22
@@ -98,6 +99,9 @@ class LevelMeter(ctk.CTkFrame):
         self._peak_counter: int = 0
         self._peak_hold_frames: int = int(PEAK_HOLD_SEC * 1000 / METER_UPDATE_MS)
         self._after_id: str | None = None
+        self._scale_apply_after_id: str | None = None
+        self._stable_scale: float = self._get_widget_scaling()
+        self._pending_scale: float | None = None
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=4, pady=(4, 0))
@@ -117,7 +121,7 @@ class LevelMeter(ctk.CTkFrame):
         self._label_db.pack(side="right")
 
         canvas_bg = self._get_canvas_bg()
-        self._last_scale: float = self._get_widget_scaling()
+        self._last_scale: float = self._stable_scale
 
         self._canvas = tk.Canvas(
             self,
@@ -176,7 +180,26 @@ class LevelMeter(ctk.CTkFrame):
         if self._after_id is not None:
             self.after_cancel(self._after_id)
             self._after_id = None
+        if self._scale_apply_after_id is not None:
+            self.after_cancel(self._scale_apply_after_id)
+            self._scale_apply_after_id = None
         super().destroy()
+
+    def _apply_pending_scale(self) -> None:
+        self._scale_apply_after_id = None
+        if self._pending_scale is None:
+            return
+
+        self._stable_scale = self._pending_scale
+        self._pending_scale = None
+
+    def _schedule_scale_apply(self, next_scale: float) -> None:
+        self._pending_scale = next_scale
+        if self._scale_apply_after_id is not None:
+            self.after_cancel(self._scale_apply_after_id)
+        self._scale_apply_after_id = self.after(
+            DPI_SCALE_APPLY_DEBOUNCE_MS, self._apply_pending_scale
+        )
 
     def _draw_meter(self) -> None:
         self._canvas.delete("all")
@@ -187,7 +210,11 @@ class LevelMeter(ctk.CTkFrame):
 
         # winfo_height() は tk.Canvas の固定 height を返すだけで DPI 変化を検出できない。
         # CTk の _get_widget_scaling() で現在の DPI スケール係数を取得して全 y 座標を決定する。
-        scale = self._get_widget_scaling()
+        current_scale = self._get_widget_scaling()
+        if abs(current_scale - self._stable_scale) > 1e-3:
+            self._schedule_scale_apply(current_scale)
+
+        scale = self._stable_scale
         if scale != self._last_scale:
             self._last_scale = scale
             self._canvas.configure(height=round((METER_BAR_HEIGHT + METER_SCALE_HEIGHT) * scale))
