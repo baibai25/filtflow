@@ -67,16 +67,11 @@ METER_YELLOW_MAX_DB: float = -9.0  # -20 〜 -9 dBFS:  黄
 COLOR_GREEN: str = "#00cc00"
 COLOR_YELLOW: str = "#ffff00"
 COLOR_RED: str = "#ff0000"
-# OBS スタイルメーター：非アクティブ帯の dim カラー（ダーク / ライト）
-DIM_GREEN_DARK: str = "#004000"
-DIM_YELLOW_DARK: str = "#404000"
-DIM_RED_DARK: str = "#400000"
-METER_BG_DARK: str = "#111111"
-
-DIM_GREEN_LIGHT: str = "#88cc88"
-DIM_YELLOW_LIGHT: str = "#cccc66"
-DIM_RED_LIGHT: str = "#cc8888"
-METER_BG_LIGHT: str = "#d0d0d0"
+# OBS スタイルメーター：非アクティブ帯の dim カラー
+DIM_GREEN: str = "#004000"
+DIM_YELLOW: str = "#404000"
+DIM_RED: str = "#400000"
+METER_CANVAS_BG: str = "#111111"
 
 METER_MIN_DB: float = -60.0
 METER_MAX_DB: float = 0.0
@@ -99,7 +94,6 @@ class LevelMeter(ctk.CTkFrame):
         self._peak_db: float = METER_MIN_DB
         self._peak_counter: int = 0
         self._peak_hold_frames: int = int(PEAK_HOLD_SEC * 1000 / METER_UPDATE_MS)
-        self._current_mode: str = ""
 
         # ラベル行
         header = ctk.CTkFrame(self)
@@ -113,7 +107,7 @@ class LevelMeter(ctk.CTkFrame):
         self._label_db.pack(side="right")
 
         # キャンバス（メーターバー）
-        self._canvas = tk.Canvas(self, height=16, bg=METER_BG_DARK, highlightthickness=0)
+        self._canvas = tk.Canvas(self, height=16, bg=METER_CANVAS_BG, highlightthickness=0)
         self._canvas.pack(fill="x", padx=4, pady=(2, 6))
 
         self._update()
@@ -150,16 +144,6 @@ class LevelMeter(ctk.CTkFrame):
         self.after(METER_UPDATE_MS, self._update)
 
     def _draw_meter(self) -> None:
-        # テーマ切替を検出してキャンバス背景と dim カラーを更新
-        mode = ctk.get_appearance_mode().lower()
-        if mode != self._current_mode:
-            self._current_mode = mode
-            self._canvas.configure(bg=METER_BG_LIGHT if mode == "light" else METER_BG_DARK)
-
-        dim_green = DIM_GREEN_LIGHT if mode == "light" else DIM_GREEN_DARK
-        dim_yellow = DIM_YELLOW_LIGHT if mode == "light" else DIM_YELLOW_DARK
-        dim_red = DIM_RED_LIGHT if mode == "light" else DIM_RED_DARK
-
         self._canvas.delete("all")
         w = self._canvas.winfo_width()
         h = self._canvas.winfo_height()
@@ -172,9 +156,9 @@ class LevelMeter(ctk.CTkFrame):
         x_peak = self._db_to_x(self._peak_db, w)
 
         # --- 背景：OBS スタイルの dim カラーゾーン（全幅） ---
-        self._canvas.create_rectangle(0, 0, x_green, h, fill=dim_green, outline="")
-        self._canvas.create_rectangle(x_green, 0, x_yellow, h, fill=dim_yellow, outline="")
-        self._canvas.create_rectangle(x_yellow, 0, w, h, fill=dim_red, outline="")
+        self._canvas.create_rectangle(0, 0, x_green, h, fill=DIM_GREEN, outline="")
+        self._canvas.create_rectangle(x_green, 0, x_yellow, h, fill=DIM_YELLOW, outline="")
+        self._canvas.create_rectangle(x_yellow, 0, w, h, fill=DIM_RED, outline="")
 
         # --- アクティブレベルを上書き ---
         end_green = min(x_level, x_green)
