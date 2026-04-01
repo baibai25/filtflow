@@ -351,7 +351,7 @@ class SettingsWindow(ctk.CTkToplevel):
         self.geometry("600x880")
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
 
-        self._last_scaling: float = self._get_widget_scaling()
+        self._last_scaling: float = self._get_window_scaling()
         self.bind("<Configure>", self._on_configure)
 
         self._build_ui(level_queue)
@@ -618,7 +618,7 @@ class SettingsWindow(ctk.CTkToplevel):
         """DPI変化を検出してレベルメーターキャンバスを再構築する。"""
         if event.widget is not self:
             return
-        new_scaling = self._get_widget_scaling()
+        new_scaling = self._get_window_scaling()
         if new_scaling != self._last_scaling:
             self._last_scaling = new_scaling
             self.after_idle(self._rebuild_level_meter)
