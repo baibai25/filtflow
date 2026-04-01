@@ -1,4 +1,4 @@
-"""設定 UI（tkinter）
+"""設定 UI（CustomTkinter）
 
 デバイス選択・フィルタパラメータのスライダー・レベルメーターを提供する。
 スライダー操作中にリアルタイムで update_params() を呼び出し即時反映する。
@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import queue
 import tkinter as tk
-from tkinter import ttk
-from typing import Any, Callable
+from typing import Callable
+
+import customtkinter as ctk
 
 from audio_stream import (
     AudioStream,
@@ -57,6 +58,9 @@ from expander import (
     Expander,
 )
 
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
+
 # --- OBS 準拠レベルメーターの色しきい値 ---
 METER_GREEN_MAX_DB: float = -20.0  # -60 〜 -20 dBFS: 緑
 METER_YELLOW_MAX_DB: float = -9.0  # -20 〜 -9 dBFS:  黄
@@ -64,22 +68,23 @@ METER_YELLOW_MAX_DB: float = -9.0  # -20 〜 -9 dBFS:  黄
 COLOR_GREEN: str = "#00cc00"
 COLOR_YELLOW: str = "#ffff00"
 COLOR_RED: str = "#ff0000"
-COLOR_BACKGROUND: str = "#1a1a1a"
 
 METER_MIN_DB: float = -60.0
 METER_MAX_DB: float = 0.0
 METER_UPDATE_MS: int = 30
 PEAK_HOLD_SEC: float = 2.0
 
+BLOCK_SIZE_OPTIONS: list[str] = ["128", "256", "480", "512", "960", "1024"]
 
-class LevelMeter(tk.Frame):
+
+class LevelMeter(ctk.CTkFrame):
     """OBS 準拠配色の OUT レベルメーター。
 
     フィルタ後の音声レベルを 30ms ごとに更新し、2 秒ピーク保持で表示する。
     """
 
-    def __init__(self, parent: tk.Widget, level_queue: queue.Queue[float]) -> None:
-        super().__init__(parent, bg=COLOR_BACKGROUND)
+    def __init__(self, parent: ctk.CTkFrame, level_queue: queue.Queue[float]) -> None:
+        super().__init__(parent, fg_color="transparent")
         self._queue = level_queue
         self._level_db: float = METER_MIN_DB
         self._peak_db: float = METER_MIN_DB
@@ -87,21 +92,19 @@ class LevelMeter(tk.Frame):
         self._peak_hold_frames: int = int(PEAK_HOLD_SEC * 1000 / METER_UPDATE_MS)
 
         # ラベル行
-        header = tk.Frame(self, bg=COLOR_BACKGROUND)
+        header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=4, pady=(4, 0))
-        tk.Label(header, text="OUT", fg="white", bg=COLOR_BACKGROUND, width=4).pack(side="left")
-        self._label_db = tk.Label(
-            header, text="-60.0 dB", fg="white", bg=COLOR_BACKGROUND, width=10
-        )
-        self._label_db.pack(side="right")
-        self._label_peak = tk.Label(
-            header, text="peak: -60.0 dB", fg="#aaaaaa", bg=COLOR_BACKGROUND, width=16
+        ctk.CTkLabel(header, text="OUT", anchor="w", width=40).pack(side="left")
+        self._label_peak = ctk.CTkLabel(
+            header, text="peak: -60.0 dB", text_color="gray60", anchor="e", width=130
         )
         self._label_peak.pack(side="right")
+        self._label_db = ctk.CTkLabel(header, text="-60.0 dB", anchor="e", width=90)
+        self._label_db.pack(side="right")
 
         # キャンバス（メーターバー）
-        self._canvas = tk.Canvas(self, height=16, bg="#333333", highlightthickness=0)
-        self._canvas.pack(fill="x", padx=4, pady=(2, 4))
+        self._canvas = tk.Canvas(self, height=16, bg="#2b2b2b", highlightthickness=0)
+        self._canvas.pack(fill="x", padx=4, pady=(2, 6))
 
         self._update()
 
@@ -113,7 +116,6 @@ class LevelMeter(tk.Frame):
 
     def _update(self) -> None:
         """30ms ごとにキューを読み出してメーターを再描画する。"""
-        # キューから最新の値を取得（複数積まれていれば最後の値を使う）
         latest_db = self._level_db
         try:
             while True:
@@ -132,13 +134,9 @@ class LevelMeter(tk.Frame):
                 self._peak_db = self._level_db
                 self._peak_counter = 0
 
-        # 描画
         self._draw()
-
-        # ラベル更新
-        self._label_db.config(text=f"{self._level_db:+.1f} dB")
-        self._label_peak.config(text=f"peak: {self._peak_db:+.1f} dB")
-
+        self._label_db.configure(text=f"{self._level_db:+.1f} dB")
+        self._label_peak.configure(text=f"peak: {self._peak_db:+.1f} dB")
         self.after(METER_UPDATE_MS, self._update)
 
     def _draw(self) -> None:
@@ -148,27 +146,22 @@ class LevelMeter(tk.Frame):
         if w <= 1:
             return
 
-        # 区切り x 座標
-        x_green = self._db_to_x(METER_GREEN_MAX_DB, w)  # -20 dBFS
-        x_yellow = self._db_to_x(METER_YELLOW_MAX_DB, w)  # -9 dBFS
+        x_green = self._db_to_x(METER_GREEN_MAX_DB, w)
+        x_yellow = self._db_to_x(METER_YELLOW_MAX_DB, w)
         x_level = self._db_to_x(self._level_db, w)
         x_peak = self._db_to_x(self._peak_db, w)
 
-        # 緑区間
         end_green = min(x_level, x_green)
         if end_green > 0:
             self._canvas.create_rectangle(0, 0, end_green, h, fill=COLOR_GREEN, outline="")
 
-        # 黄区間
         if x_level > x_green:
             end_yellow = min(x_level, x_yellow)
             self._canvas.create_rectangle(x_green, 0, end_yellow, h, fill=COLOR_YELLOW, outline="")
 
-        # 赤区間
         if x_level > x_yellow:
             self._canvas.create_rectangle(x_yellow, 0, x_level, h, fill=COLOR_RED, outline="")
 
-        # ピーク線
         if 0 < x_peak < w:
             peak_color = (
                 COLOR_RED
@@ -180,12 +173,12 @@ class LevelMeter(tk.Frame):
             self._canvas.create_line(x_peak, 0, x_peak, h, fill=peak_color, width=2)
 
 
-class _SliderRow(tk.Frame):
+class _SliderRow(ctk.CTkFrame):
     """ラベル + スライダー + 値表示の 1 行コンポーネント。"""
 
     def __init__(
         self,
-        parent: tk.Widget,
+        parent: ctk.CTkFrame,
         label: str,
         from_: float,
         to: float,
@@ -193,43 +186,63 @@ class _SliderRow(tk.Frame):
         initial: float,
         unit: str,
         on_change: Callable[[float], None],
-        **kwargs: Any,
     ) -> None:
-        super().__init__(parent, **kwargs)
+        super().__init__(parent, fg_color="transparent")
         self._on_change = on_change
         self._unit = unit
+        self._value = initial
 
-        tk.Label(self, text=label, width=14, anchor="w").pack(side="left")
-        self._var = tk.DoubleVar(value=initial)
-        self._var.trace_add("write", self._on_trace)
-        tk.Scale(
+        ctk.CTkLabel(self, text=label, width=110, anchor="w").pack(side="left")
+
+        steps = max(1, int(round((to - from_) / resolution)))
+        self._slider = ctk.CTkSlider(
             self,
-            variable=self._var,
             from_=from_,
             to=to,
-            resolution=resolution,
-            orient="horizontal",
-            length=180,
-            showvalue=False,
-        ).pack(side="left")
-        range_text = f"({from_:.0f}-{to:.0f}{unit})"
-        self._val_label = tk.Label(self, text=self._format(initial), width=18, anchor="w")
+            number_of_steps=steps,
+            command=self._on_slider,
+            width=200,
+        )
+        self._slider.set(initial)
+        self._slider.pack(side="left", padx=(0, 8))
+
+        self._val_label = ctk.CTkLabel(self, text=self._format(initial), width=90, anchor="w")
         self._val_label.pack(side="left")
-        tk.Label(self, text=range_text, fg="#888888", anchor="w").pack(side="left")
+
+        range_text = f"({from_:.0f}–{to:.0f} {unit})"
+        ctk.CTkLabel(self, text=range_text, text_color="gray60", anchor="w").pack(side="left")
 
     def _format(self, v: float) -> str:
         return f"{v:.1f} {self._unit}"
 
-    def _on_trace(self, *_: object) -> None:
-        v = self._var.get()
-        self._val_label.config(text=self._format(v))
+    def _on_slider(self, v: float) -> None:
+        self._value = v
+        self._val_label.configure(text=self._format(v))
         self._on_change(v)
 
+    def get(self) -> float:
+        return self._value
+
     def set(self, value: float) -> None:
-        self._var.set(value)
+        self._value = value
+        self._slider.set(value)
+        self._val_label.configure(text=self._format(value))
 
 
-class SettingsWindow(tk.Toplevel):
+def _section_frame(parent: ctk.CTkScrollableFrame, title: str) -> ctk.CTkFrame:
+    """タイトルラベル付きのカードフレームを作成して返す。"""
+    card = ctk.CTkFrame(parent, corner_radius=8)
+    card.pack(fill="x", padx=8, pady=4)
+    ctk.CTkLabel(
+        card,
+        text=title,
+        font=ctk.CTkFont(size=12, weight="bold"),
+        anchor="w",
+    ).pack(fill="x", padx=10, pady=(8, 2))
+    return card
+
+
+class SettingsWindow(ctk.CTkToplevel):
     """Filtflow 設定ウィンドウ。
 
     デバイス選択・フィルタパラメータ・レベルメーターを提供する。
@@ -238,7 +251,7 @@ class SettingsWindow(tk.Toplevel):
 
     def __init__(
         self,
-        master: tk.Tk,
+        master: ctk.CTk,
         config: Config,
         compressor: Compressor,
         expander: Expander,
@@ -252,58 +265,86 @@ class SettingsWindow(tk.Toplevel):
         self._stream = stream
 
         self.title("Filtflow 設定")
-        self.resizable(False, False)
+        self.resizable(False, True)
+        self.minsize(560, 400)
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
 
         self._build_ui(level_queue)
         self._refresh_device_lists()
 
     def _build_ui(self, level_queue: queue.Queue[float]) -> None:
-        pad: dict[str, Any] = {"padx": 8, "pady": 4}
+        scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=4, pady=4)
 
         # --- レベルメーター ---
-        meter_frame = tk.LabelFrame(self, text="レベルメーター")
-        meter_frame.pack(fill="x", **pad)
-        LevelMeter(meter_frame, level_queue).pack(fill="x")
+        meter_card = _section_frame(scroll, "レベルメーター")
+        LevelMeter(meter_card, level_queue).pack(fill="x", padx=6, pady=(0, 6))
 
         # --- デバイス設定 ---
-        dev_frame = tk.LabelFrame(self, text="デバイス設定")
-        dev_frame.pack(fill="x", **pad)
+        dev_card = _section_frame(scroll, "デバイス設定")
+        dev_grid = ctk.CTkFrame(dev_card, fg_color="transparent")
+        dev_grid.pack(fill="x", padx=6, pady=(0, 8))
 
-        tk.Label(dev_frame, text="入力デバイス:", anchor="w").grid(
-            row=0, column=0, sticky="w", padx=6, pady=2
+        ctk.CTkLabel(dev_grid, text="入力デバイス:", anchor="w", width=110).grid(
+            row=0, column=0, sticky="w", padx=4, pady=3
         )
         self._input_var = tk.StringVar(value=self._config.input_device_name)
-        self._input_combo = ttk.Combobox(
-            dev_frame, textvariable=self._input_var, width=40, state="readonly"
+        self._input_combo = ctk.CTkComboBox(
+            dev_grid,
+            variable=self._input_var,
+            values=[],
+            width=330,
+            state="readonly",
+            command=lambda _: self._on_device_change(),
         )
-        self._input_combo.grid(row=0, column=1, padx=6, pady=2)
-        self._input_combo.bind("<<ComboboxSelected>>", self._on_device_change)
+        self._input_combo.grid(row=0, column=1, columnspan=2, padx=4, pady=3, sticky="w")
 
-        tk.Label(dev_frame, text="出力デバイス:", anchor="w").grid(
-            row=1, column=0, sticky="w", padx=6, pady=2
+        ctk.CTkLabel(dev_grid, text="出力デバイス:", anchor="w", width=110).grid(
+            row=1, column=0, sticky="w", padx=4, pady=3
         )
         self._output_var = tk.StringVar(value=self._config.output_device_name)
-        self._output_combo = ttk.Combobox(
-            dev_frame, textvariable=self._output_var, width=40, state="readonly"
+        self._output_combo = ctk.CTkComboBox(
+            dev_grid,
+            variable=self._output_var,
+            values=[],
+            width=330,
+            state="readonly",
+            command=lambda _: self._on_device_change(),
         )
-        self._output_combo.grid(row=1, column=1, padx=6, pady=2)
-        self._output_combo.bind("<<ComboboxSelected>>", self._on_device_change)
+        self._output_combo.grid(row=1, column=1, columnspan=2, padx=4, pady=3, sticky="w")
+
+        ctk.CTkLabel(dev_grid, text="ブロックサイズ:", anchor="w", width=110).grid(
+            row=2, column=0, sticky="w", padx=4, pady=3
+        )
+        self._block_size_var = tk.StringVar(value=str(self._config.block_size))
+        self._block_size_combo = ctk.CTkComboBox(
+            dev_grid,
+            variable=self._block_size_var,
+            values=BLOCK_SIZE_OPTIONS,
+            width=120,
+            state="readonly",
+            command=lambda _: self._on_block_size_change(),
+        )
+        self._block_size_combo.grid(row=2, column=1, padx=4, pady=3, sticky="w")
+        ctk.CTkLabel(dev_grid, text="samples", text_color="gray60", anchor="w").grid(
+            row=2, column=2, padx=2, pady=3, sticky="w"
+        )
 
         # --- Compressor ---
-        comp_frame = tk.LabelFrame(self, text="Compressor")
-        comp_frame.pack(fill="x", **pad)
+        comp_card = _section_frame(scroll, "Compressor")
 
+        comp_top = ctk.CTkFrame(comp_card, fg_color="transparent")
+        comp_top.pack(fill="x", padx=6)
         self._comp_enabled = tk.BooleanVar(value=self._config.compressor.enabled)
-        tk.Checkbutton(
-            comp_frame,
+        ctk.CTkCheckBox(
+            comp_top,
             text="有効",
             variable=self._comp_enabled,
             command=self._on_comp_enabled_change,
-        ).pack(anchor="e", padx=6)
+        ).pack(anchor="e")
 
         self._comp_ratio = _SliderRow(
-            comp_frame,
+            comp_card,
             "Ratio",
             COMP_MIN_RATIO,
             COMP_MAX_RATIO,
@@ -315,7 +356,7 @@ class SettingsWindow(tk.Toplevel):
         self._comp_ratio.pack(fill="x", padx=6, pady=1)
 
         self._comp_threshold = _SliderRow(
-            comp_frame,
+            comp_card,
             "Threshold",
             COMP_MIN_THRESHOLD_DB,
             0.0,
@@ -327,7 +368,7 @@ class SettingsWindow(tk.Toplevel):
         self._comp_threshold.pack(fill="x", padx=6, pady=1)
 
         self._comp_attack = _SliderRow(
-            comp_frame,
+            comp_card,
             "Attack",
             COMP_MIN_ATK_RLS_MS,
             COMP_MAX_ATK_MS,
@@ -339,7 +380,7 @@ class SettingsWindow(tk.Toplevel):
         self._comp_attack.pack(fill="x", padx=6, pady=1)
 
         self._comp_release = _SliderRow(
-            comp_frame,
+            comp_card,
             "Release",
             COMP_MIN_ATK_RLS_MS,
             COMP_MAX_RLS_MS,
@@ -351,7 +392,7 @@ class SettingsWindow(tk.Toplevel):
         self._comp_release.pack(fill="x", padx=6, pady=1)
 
         self._comp_output_gain = _SliderRow(
-            comp_frame,
+            comp_card,
             "Output Gain",
             COMP_MIN_OUTPUT_GAIN,
             COMP_MAX_OUTPUT_GAIN,
@@ -360,35 +401,36 @@ class SettingsWindow(tk.Toplevel):
             "dB",
             lambda v: self._compressor.update_params(output_gain_db=v),
         )
-        self._comp_output_gain.pack(fill="x", padx=6, pady=1)
+        self._comp_output_gain.pack(fill="x", padx=6, pady=(1, 8))
 
         # --- Expander ---
-        exp_frame = tk.LabelFrame(self, text="Expander")
-        exp_frame.pack(fill="x", **pad)
+        exp_card = _section_frame(scroll, "Expander")
 
+        exp_top = ctk.CTkFrame(exp_card, fg_color="transparent")
+        exp_top.pack(fill="x", padx=6)
         self._exp_enabled = tk.BooleanVar(value=self._config.expander.enabled)
-        tk.Checkbutton(
-            exp_frame,
+        ctk.CTkCheckBox(
+            exp_top,
             text="有効",
             variable=self._exp_enabled,
             command=self._on_exp_enabled_change,
-        ).pack(anchor="e", padx=6)
+        ).pack(anchor="e")
 
-        preset_row = tk.Frame(exp_frame)
+        preset_row = ctk.CTkFrame(exp_card, fg_color="transparent")
         preset_row.pack(fill="x", padx=6, pady=1)
-        tk.Label(preset_row, text="Preset", width=14, anchor="w").pack(side="left")
+        ctk.CTkLabel(preset_row, text="Preset", width=110, anchor="w").pack(side="left")
         self._exp_preset_var = tk.StringVar(value=self._config.expander.preset)
-        ttk.Combobox(
+        ctk.CTkComboBox(
             preset_row,
-            textvariable=self._exp_preset_var,
+            variable=self._exp_preset_var,
             values=[PRESET_EXPANDER, PRESET_GATE],
-            width=12,
+            width=140,
             state="readonly",
+            command=lambda _: self._on_preset_change(),
         ).pack(side="left")
-        self._exp_preset_var.trace_add("write", self._on_preset_change)
 
         self._exp_ratio = _SliderRow(
-            exp_frame,
+            exp_card,
             "Ratio",
             EXP_MIN_RATIO,
             EXP_MAX_RATIO,
@@ -400,7 +442,7 @@ class SettingsWindow(tk.Toplevel):
         self._exp_ratio.pack(fill="x", padx=6, pady=1)
 
         self._exp_threshold = _SliderRow(
-            exp_frame,
+            exp_card,
             "Threshold",
             EXP_MIN_THRESHOLD_DB,
             0.0,
@@ -412,7 +454,7 @@ class SettingsWindow(tk.Toplevel):
         self._exp_threshold.pack(fill="x", padx=6, pady=1)
 
         self._exp_attack = _SliderRow(
-            exp_frame,
+            exp_card,
             "Attack",
             EXP_MIN_ATK_RLS_MS,
             EXP_MAX_ATK_MS,
@@ -424,7 +466,7 @@ class SettingsWindow(tk.Toplevel):
         self._exp_attack.pack(fill="x", padx=6, pady=1)
 
         self._exp_release = _SliderRow(
-            exp_frame,
+            exp_card,
             "Release",
             EXP_MIN_ATK_RLS_MS,
             EXP_MAX_RLS_MS,
@@ -436,7 +478,7 @@ class SettingsWindow(tk.Toplevel):
         self._exp_release.pack(fill="x", padx=6, pady=1)
 
         self._exp_output_gain = _SliderRow(
-            exp_frame,
+            exp_card,
             "Output Gain",
             EXP_MIN_OUTPUT_GAIN,
             EXP_MAX_OUTPUT_GAIN,
@@ -447,47 +489,58 @@ class SettingsWindow(tk.Toplevel):
         )
         self._exp_output_gain.pack(fill="x", padx=6, pady=1)
 
-        detector_row = tk.Frame(exp_frame)
-        detector_row.pack(fill="x", padx=6, pady=1)
-        tk.Label(detector_row, text="Detector", width=14, anchor="w").pack(side="left")
+        detector_row = ctk.CTkFrame(exp_card, fg_color="transparent")
+        detector_row.pack(fill="x", padx=6, pady=(1, 8))
+        ctk.CTkLabel(detector_row, text="Detector", width=110, anchor="w").pack(side="left")
         self._exp_detector_var = tk.StringVar(value=self._config.expander.detector)
-        ttk.Combobox(
+        ctk.CTkComboBox(
             detector_row,
-            textvariable=self._exp_detector_var,
+            variable=self._exp_detector_var,
             values=[DETECTOR_RMS, DETECTOR_PEAK],
-            width=12,
+            width=140,
             state="readonly",
+            command=lambda _: self._on_detector_change(),
         ).pack(side="left")
-        self._exp_detector_var.trace_add("write", self._on_detector_change)
 
         # --- ボタン行 ---
-        btn_frame = tk.Frame(self)
-        btn_frame.pack(fill="x", **pad)
-        tk.Button(btn_frame, text="保存", width=12, command=self._on_save).pack(side="left", padx=4)
-        tk.Button(btn_frame, text="デフォルトに戻す", width=16, command=self._on_reset).pack(
+        btn_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=8, pady=4)
+        ctk.CTkButton(btn_frame, text="保存", width=100, command=self._on_save).pack(
             side="left", padx=4
         )
+        ctk.CTkButton(
+            btn_frame,
+            text="デフォルトに戻す",
+            width=140,
+            fg_color="gray30",
+            hover_color="gray40",
+            command=self._on_reset,
+        ).pack(side="left", padx=4)
 
         # --- エラー表示ラベル ---
-        self._error_label = tk.Label(self, text="", fg="red")
-        self._error_label.pack(fill="x", padx=8)
+        self._error_label = ctk.CTkLabel(scroll, text="", text_color="#ff6666")
+        self._error_label.pack(fill="x", padx=8, pady=(0, 4))
 
     def _refresh_device_lists(self) -> None:
         """デバイス一覧を再取得してコンボボックスを更新する。"""
         in_names = [str(d["name"]) for d in list_input_devices()]
         out_names = [str(d["name"]) for d in list_output_devices()]
-        self._input_combo["values"] = in_names
-        self._output_combo["values"] = out_names
+        self._input_combo.configure(values=in_names)
+        self._output_combo.configure(values=out_names)
+        if self._config.input_device_name:
+            self._input_combo.set(self._config.input_device_name)
+        if self._config.output_device_name:
+            self._output_combo.set(self._config.output_device_name)
 
     def show_error(self, msg: str) -> None:
-        self._error_label.config(text=msg)
+        self._error_label.configure(text=msg)
 
     def clear_error(self) -> None:
-        self._error_label.config(text="")
+        self._error_label.configure(text="")
 
     # --- イベントハンドラ ---
 
-    def _on_device_change(self, _event: object = None) -> None:
+    def _on_device_change(self) -> None:
         in_name = self._input_var.get()
         out_name = self._output_var.get()
         in_idx = find_device_index(in_name, is_input=True)
@@ -496,6 +549,15 @@ class SettingsWindow(tk.Toplevel):
             self._stream.update_devices(in_idx, out_idx)
             self._config.input_device_name = in_name
             self._config.output_device_name = out_name
+            self.clear_error()
+        except Exception as exc:
+            self.show_error(f"デバイスエラー: {exc}")
+
+    def _on_block_size_change(self) -> None:
+        block_size = int(self._block_size_var.get())
+        self._config.block_size = block_size
+        try:
+            self._stream.update_block_size(block_size)
             self.clear_error()
         except Exception as exc:
             self.show_error(f"デバイスエラー: {exc}")
@@ -510,13 +572,11 @@ class SettingsWindow(tk.Toplevel):
         self._config.expander.enabled = enabled
         self._expander.enabled = enabled
 
-    def _on_preset_change(self, *_: object) -> None:
+    def _on_preset_change(self) -> None:
         preset = self._exp_preset_var.get()
         self._expander.update_params(preset=preset)
         self._config.expander.preset = preset
 
-        # プリセットに対応するデフォルト値をスライダーとフィルタに適用する。
-        # ratio と release_ms がプリセット間で異なる（設計書 §3.2 参照）。
         if preset == PRESET_GATE:
             ratio: float = GATE_DEFAULT_RATIO
             release_ms: int = GATE_DEFAULT_RELEASE_MS
@@ -528,7 +588,7 @@ class SettingsWindow(tk.Toplevel):
         self._exp_release.set(float(release_ms))
         self._expander.update_params(ratio=ratio, release_ms=release_ms)
 
-    def _on_detector_change(self, *_: object) -> None:
+    def _on_detector_change(self) -> None:
         detector = self._exp_detector_var.get()
         self._expander.update_params(detector=detector)
         self._config.expander.detector = detector
@@ -537,20 +597,20 @@ class SettingsWindow(tk.Toplevel):
         """現在の UI 値を config に反映して JSON 保存する。"""
         c = self._config.compressor
         c.enabled = self._comp_enabled.get()
-        c.ratio = self._comp_ratio._var.get()
-        c.threshold_db = self._comp_threshold._var.get()
-        c.attack_ms = int(self._comp_attack._var.get())
-        c.release_ms = int(self._comp_release._var.get())
-        c.output_gain_db = self._comp_output_gain._var.get()
+        c.ratio = self._comp_ratio.get()
+        c.threshold_db = self._comp_threshold.get()
+        c.attack_ms = int(self._comp_attack.get())
+        c.release_ms = int(self._comp_release.get())
+        c.output_gain_db = self._comp_output_gain.get()
 
         e = self._config.expander
         e.enabled = self._exp_enabled.get()
         e.preset = self._exp_preset_var.get()
-        e.ratio = self._exp_ratio._var.get()
-        e.threshold_db = self._exp_threshold._var.get()
-        e.attack_ms = int(self._exp_attack._var.get())
-        e.release_ms = int(self._exp_release._var.get())
-        e.output_gain_db = self._exp_output_gain._var.get()
+        e.ratio = self._exp_ratio.get()
+        e.threshold_db = self._exp_threshold.get()
+        e.attack_ms = int(self._exp_attack.get())
+        e.release_ms = int(self._exp_release.get())
+        e.output_gain_db = self._exp_output_gain.get()
         e.detector = self._exp_detector_var.get()
 
         try:

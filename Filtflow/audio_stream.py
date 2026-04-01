@@ -214,6 +214,11 @@ class AudioStream:
         self._output_device = output_device
         self.restart()
 
+    def update_block_size(self, block_size: int) -> None:
+        """ブロックサイズを変更してストリームを再起動する。"""
+        self._block_size = block_size
+        self.restart()
+
     @property
     def is_active(self) -> bool:
         """ストリームが動作中かどうか。"""
