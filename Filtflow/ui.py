@@ -351,6 +351,9 @@ class SettingsWindow(ctk.CTkToplevel):
         self.geometry("600x880")
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
 
+        self._last_scaling: float = self._get_widget_scaling()
+        self.bind("<Configure>", self._on_configure)
+
         self._build_ui(level_queue)
         self._refresh_device_lists()
 
@@ -610,6 +613,15 @@ class SettingsWindow(ctk.CTkToplevel):
         # --- エラー表示ラベル ---
         self._error_label = ctk.CTkLabel(scroll, text="", text_color="#ff6666")
         self._error_label.pack(fill="x", padx=8, pady=(0, 4))
+
+    def _on_configure(self, event: tk.Event) -> None:
+        """DPI変化を検出してレベルメーターキャンバスを再構築する。"""
+        if event.widget is not self:
+            return
+        new_scaling = self._get_widget_scaling()
+        if new_scaling != self._last_scaling:
+            self._last_scaling = new_scaling
+            self.after_idle(self._rebuild_level_meter)
 
     def _rebuild_level_meter(self) -> None:
         """Appearance 変更後にレベルメーターを作り直す。"""

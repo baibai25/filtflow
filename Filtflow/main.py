@@ -42,6 +42,20 @@ def _build_filter_chain(
 
 
 def main() -> None:
+    # --- Windows: Per-Monitor DPI Aware v2 を宣言（ビットマップスケーリングを無効化） ---
+    if sys.platform == "win32":
+        import ctypes
+
+        try:
+            # Windows 10 1703+ 推奨: Per-Monitor DPI Aware v2
+            ctypes.windll.user32.SetThreadDpiAwarenessContext(ctypes.c_ssize_t(-4))
+        except (AttributeError, OSError):
+            try:
+                # Windows 8.1+ フォールバック: Per-Monitor DPI Aware v1
+                ctypes.windll.shcore.SetProcessDpiAwareness(2)
+            except (AttributeError, OSError):
+                pass
+
     # --- 設定ロード ---
     config = Config.load()
     ctk.set_appearance_mode(config.appearance_mode)
