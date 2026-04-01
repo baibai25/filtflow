@@ -76,6 +76,7 @@ METER_MIN_DB: float = -60.0
 METER_MAX_DB: float = 0.0
 METER_UPDATE_MS: int = 30
 PEAK_HOLD_SEC: float = 2.0
+WINDOW_MOVE_RENDER_RESUME_DEBOUNCE_MS: int = 160
 
 METER_BAR_HEIGHT: int = 12
 METER_SCALE_HEIGHT: int = 22
@@ -99,6 +100,8 @@ class LevelMeter(ctk.CTkFrame):
         self._peak_hold_frames: int = int(PEAK_HOLD_SEC * 1000 / METER_UPDATE_MS)
         self._after_id: str | None = None
         self._canvas_width: int = 0
+        self._render_paused: bool = False
+        self._render_dirty: bool = False
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=4, pady=(4, 0))
@@ -178,6 +181,14 @@ class LevelMeter(ctk.CTkFrame):
         self._label_peak.configure(text=f"peak: {self._peak_db:+.1f} dB")
         self._after_id = self.after(METER_UPDATE_MS, self._update)
 
+    def set_render_paused(self, paused: bool) -> None:
+        if self._render_paused == paused:
+            return
+        self._render_paused = paused
+        if not paused and self._render_dirty:
+            self._render_dirty = False
+            self._draw_meter()
+
     def destroy(self) -> None:
         if self._after_id is not None:
             self.after_cancel(self._after_id)
@@ -232,6 +243,10 @@ class LevelMeter(ctk.CTkFrame):
         self._peak_id = self._canvas.create_line(0, 0, 0, bar_h, fill=COLOR_GREEN, width=2)
 
     def _draw_meter(self) -> None:
+        if self._render_paused:
+            self._render_dirty = True
+            return
+
         w = self._canvas_width or self._canvas.winfo_width()
         if w <= 1:
             return
@@ -367,6 +382,7 @@ class SettingsWindow(ctk.CTkToplevel):
         self._stream = stream
 
         self._save_after_id: str | None = None
+        self._move_settle_after_id: str | None = None
         self._level_meter: LevelMeter | None = None
         self._level_meter_card: ctk.CTkFrame | None = None
         self._level_queue: queue.Queue[float] = level_queue
@@ -375,9 +391,32 @@ class SettingsWindow(ctk.CTkToplevel):
         self.resizable(True, True)
         self.minsize(520, 400)
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
+        self.bind("<Configure>", self._on_window_configure, add="+")
 
         self._build_ui(level_queue)
         self._refresh_device_lists()
+
+    def _on_window_configure(self, _event: tk.Event) -> None:
+        if self._level_meter is None:
+            return
+        self._level_meter.set_render_paused(True)
+        if self._move_settle_after_id is not None:
+            self.after_cancel(self._move_settle_after_id)
+        self._move_settle_after_id = self.after(
+            WINDOW_MOVE_RENDER_RESUME_DEBOUNCE_MS, self._resume_meter_render
+        )
+
+    def _resume_meter_render(self) -> None:
+        self._move_settle_after_id = None
+        if self._level_meter is None:
+            return
+        self._level_meter.set_render_paused(False)
+
+    def destroy(self) -> None:
+        if self._move_settle_after_id is not None:
+            self.after_cancel(self._move_settle_after_id)
+            self._move_settle_after_id = None
+        super().destroy()
 
     def _build_ui(self, level_queue: queue.Queue[float]) -> None:
         scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
