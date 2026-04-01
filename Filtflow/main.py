@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import queue
 import sys
-import tkinter as tk
 from typing import Callable
 
+import customtkinter as ctk
 import numpy as np
 from audio_stream import AudioStream, find_device_index
 from compressor import Compressor
@@ -44,6 +44,7 @@ def _build_filter_chain(
 def main() -> None:
     # --- 設定ロード ---
     config = Config.load()
+    ctk.set_appearance_mode(config.appearance_mode)
 
     # --- フィルタ初期化 ---
     compressor = Compressor(
@@ -85,8 +86,8 @@ def main() -> None:
         level_queue=level_queue,
     )
 
-    # --- tkinter ルートウィンドウ（非表示で常駐） ---
-    root = tk.Tk()
+    # --- ルートウィンドウ（非表示で常駐） ---
+    root = ctk.CTk()
     root.withdraw()
     root.title("Filtflow")
 
