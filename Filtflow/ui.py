@@ -134,12 +134,12 @@ class LevelMeter(ctk.CTkFrame):
                 self._peak_db = self._level_db
                 self._peak_counter = 0
 
-        self._draw()
+        self._draw_meter()
         self._label_db.configure(text=f"{self._level_db:+.1f} dB")
         self._label_peak.configure(text=f"peak: {self._peak_db:+.1f} dB")
         self.after(METER_UPDATE_MS, self._update)
 
-    def _draw(self) -> None:
+    def _draw_meter(self) -> None:
         self._canvas.delete("all")
         w = self._canvas.winfo_width()
         h = self._canvas.winfo_height()
