@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import queue
+import sys
 import tkinter as tk
 from typing import Callable
 
@@ -352,10 +353,12 @@ class SettingsWindow(ctk.CTkToplevel):
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
 
         self._last_scaling: float = self._get_window_scaling()
+        self._wndproc_ref: object = None  # GC防止用（Windows専用）
         self.bind("<Configure>", self._on_configure)
 
         self._build_ui(level_queue)
         self._refresh_device_lists()
+        self.after_idle(self._setup_dpi_hook)
 
     def _build_ui(self, level_queue: queue.Queue[float]) -> None:
         scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
@@ -613,6 +616,61 @@ class SettingsWindow(ctk.CTkToplevel):
         # --- エラー表示ラベル ---
         self._error_label = ctk.CTkLabel(scroll, text="", text_color="#ff6666")
         self._error_label.pack(fill="x", padx=8, pady=(0, 4))
+
+    def _setup_dpi_hook(self) -> None:
+        """WM_DPICHANGED を傍受し、再描画ちらつきを抑制するWndProcフックを設定する（Windows専用）。
+
+        CustomTkinterはDPI変化時にウィジェットを1つずつ再スケーリングするため、
+        その途中経過が全てレンダリングされ「ぐにゃぐにゃ」して見える。
+        WM_SETREDRAW で遷移中の描画を停止し、全更新完了後に一括再描画することで
+        この問題を解消する。
+        """
+        if sys.platform != "win32":
+            return
+        import ctypes
+        import ctypes.wintypes
+
+        hwnd = self.winfo_id()
+        if not hwnd:
+            return
+
+        WM_DPICHANGED = 0x02E0
+        GWL_WNDPROC = -4
+
+        WNDPROCTYPE = ctypes.WINFUNCTYPE(
+            ctypes.c_ssize_t,
+            ctypes.wintypes.HWND,
+            ctypes.c_uint,
+            ctypes.wintypes.WPARAM,
+            ctypes.wintypes.LPARAM,
+        )
+
+        _old_wndproc = ctypes.windll.user32.GetWindowLongPtrW(hwnd, GWL_WNDPROC)
+
+        def _wndproc(hwnd: int, msg: int, wparam: int, lparam: int) -> int:
+            if msg == WM_DPICHANGED:
+                # スケーリング更新の途中経過が見えないよう再描画を停止
+                ctypes.windll.user32.SendMessageW(hwnd, 0x000B, 0, 0)  # WM_SETREDRAW=False
+                # デフォルト処理を実行（CustomTkinterのScalingTrackerによるウィジェット更新）
+                result = ctypes.windll.user32.CallWindowProcW(_old_wndproc, hwnd, msg, wparam, lparam)
+                # 全ウィジェットの更新が終わった後に一括再描画（150msはCustomTkinterの更新完了猶予）
+                self.after(150, self._flush_dpi_redraw)
+                return result
+            return ctypes.windll.user32.CallWindowProcW(_old_wndproc, hwnd, msg, wparam, lparam)
+
+        self._wndproc_ref = WNDPROCTYPE(_wndproc)  # GCされないようにインスタンス変数で保持
+        ctypes.windll.user32.SetWindowLongPtrW(hwnd, GWL_WNDPROC, self._wndproc_ref)
+
+    def _flush_dpi_redraw(self) -> None:
+        """DPI遷移後に再描画を再開してウィンドウ全体を一括更新する（Windows専用）。"""
+        if sys.platform != "win32":
+            return
+        import ctypes
+
+        hwnd = self.winfo_id()
+        ctypes.windll.user32.SendMessageW(hwnd, 0x000B, 1, 0)  # WM_SETREDRAW=True
+        # RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN
+        ctypes.windll.user32.RedrawWindow(hwnd, None, None, 0x0485)
 
     def _on_configure(self, event: tk.Event) -> None:
         """DPI変化を検出してレベルメーターキャンバスを再構築する。"""
