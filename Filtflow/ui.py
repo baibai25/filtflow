@@ -372,9 +372,8 @@ class SettingsWindow(ctk.CTkToplevel):
         self._level_queue: queue.Queue[float] = level_queue
 
         self.title("Filtflow Settings")
-        self.resizable(False, True)
-        self.minsize(600, 400)
-        self.geometry("600x880")
+        self.resizable(True, True)
+        self.minsize(520, 400)
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
 
         self._build_ui(level_queue)

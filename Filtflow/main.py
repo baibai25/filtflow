@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import queue
 import sys
 from typing import Callable
@@ -33,6 +34,16 @@ LEVEL_QUEUE_MAXSIZE: int = 16
 RECONNECT_INTERVAL_MS: int = 3000
 
 
+def _configure_windows_dpi_awareness() -> None:
+    """Windows の DPI 認識を Per-Monitor-V2 相当に設定する。"""
+    if sys.platform != "win32":
+        return
+    user32 = ctypes.windll.user32
+    # PER_MONITOR_AWARE_V2
+    dpi_context_per_monitor_v2 = ctypes.c_void_p(-4)
+    user32.SetProcessDpiAwarenessContext(dpi_context_per_monitor_v2)
+
+
 def _build_filter_chain(
     compressor: Compressor,
     expander: Expander,
@@ -42,6 +53,8 @@ def _build_filter_chain(
 
 
 def main() -> None:
+    _configure_windows_dpi_awareness()
+
     # --- 設定ロード ---
     config = Config.load()
     ctk.set_appearance_mode(config.appearance_mode)
