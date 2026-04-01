@@ -93,7 +93,7 @@ class LevelMeter(ctk.CTkFrame):
     """
 
     def __init__(self, parent: ctk.CTkFrame, level_queue: queue.Queue[float]) -> None:
-        super().__init__(parent, fg_color="transparent")
+        super().__init__(parent)
         self._queue = level_queue
         self._level_db: float = METER_MIN_DB
         self._peak_db: float = METER_MIN_DB
