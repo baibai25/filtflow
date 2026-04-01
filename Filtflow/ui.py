@@ -11,7 +11,6 @@ import tkinter as tk
 from typing import Callable
 
 import customtkinter as ctk
-
 from audio_stream import (
     AudioStream,
     find_device_index,
@@ -62,11 +61,16 @@ ctk.set_default_color_theme("blue")
 
 # --- OBS 準拠レベルメーターの色しきい値 ---
 METER_GREEN_MAX_DB: float = -20.0  # -60 〜 -20 dBFS: 緑
-METER_YELLOW_MAX_DB: float = -9.0  # -20 〜 -9 dBFS:  黄
+METER_YELLOW_MAX_DB: float = -9.0  # -20 〜 -9 dBFS: 黄
 # -9 〜 0 dBFS: 赤
-COLOR_GREEN: str = "#00cc00"
-COLOR_YELLOW: str = "#ffff00"
-COLOR_RED: str = "#ff0000"
+
+COLOR_GREEN = "#66ff66"
+COLOR_YELLOW = "#fff59d"
+COLOR_RED = "#ff8080"
+
+COLOR_BG_GREEN: str = "#2f6f2f"
+COLOR_BG_YELLOW: str = "#8a8325"
+COLOR_BG_RED: str = "#8a2525"
 
 METER_MIN_DB: float = -60.0
 METER_MAX_DB: float = 0.0
@@ -90,25 +94,49 @@ class LevelMeter(ctk.CTkFrame):
         self._peak_counter: int = 0
         self._peak_hold_frames: int = int(PEAK_HOLD_SEC * 1000 / METER_UPDATE_MS)
 
-        # ラベル行
-        header = ctk.CTkFrame(self)
+        header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=4, pady=(4, 0))
+
         ctk.CTkLabel(header, text="OUT", anchor="w", width=40).pack(side="left")
+
         self._label_peak = ctk.CTkLabel(
-            header, text="peak: -60.0 dB", text_color="gray60", anchor="e", width=130
+            header,
+            text="peak: -60.0 dB",
+            text_color="gray60",
+            anchor="e",
+            width=130,
         )
         self._label_peak.pack(side="right")
+
         self._label_db = ctk.CTkLabel(header, text="-60.0 dB", anchor="e", width=90)
         self._label_db.pack(side="right")
 
-        # キャンバス（メーターバー）
-        self._canvas = tk.Canvas(self, height=16, highlightthickness=0)
+        canvas_bg = self._get_canvas_bg()
+
+        self._canvas = tk.Canvas(
+            self,
+            height=16,
+            highlightthickness=0,
+            bd=0,
+            relief="flat",
+            bg=canvas_bg,
+            highlightbackground=canvas_bg,
+            highlightcolor=canvas_bg,
+        )
         self._canvas.pack(fill="x", padx=4, pady=(2, 6))
 
         self._update()
 
+    def _get_canvas_bg(self) -> str:
+        """親カードの現在の色に合わせた Canvas 背景色を返す。"""
+        fg_color = self.master.cget("fg_color")
+        applied = self._apply_appearance_mode(fg_color)
+        if isinstance(applied, (tuple, list)):
+            return str(applied[0])
+        return str(applied)
+
     def _db_to_x(self, db: float, width: int) -> int:
-        """dB 値をキャンバス上の x 座標に変換する（対数スケール）。"""
+        """dB 値をキャンバス上の x 座標に変換する。"""
         clamped = max(METER_MIN_DB, min(METER_MAX_DB, db))
         ratio = (clamped - METER_MIN_DB) / (METER_MAX_DB - METER_MIN_DB)
         return int(ratio * width)
@@ -121,9 +149,9 @@ class LevelMeter(ctk.CTkFrame):
                 latest_db = self._queue.get_nowait()
         except queue.Empty:
             pass
+
         self._level_db = latest_db
 
-        # ピーク保持
         if self._level_db >= self._peak_db:
             self._peak_db = self._level_db
             self._peak_counter = 0
@@ -140,15 +168,21 @@ class LevelMeter(ctk.CTkFrame):
 
     def _draw_meter(self) -> None:
         self._canvas.delete("all")
+
         w = self._canvas.winfo_width()
         h = self._canvas.winfo_height()
-        if w <= 1:
+        if w <= 1 or h <= 1:
             return
 
         x_green = self._db_to_x(METER_GREEN_MAX_DB, w)
         x_yellow = self._db_to_x(METER_YELLOW_MAX_DB, w)
         x_level = self._db_to_x(self._level_db, w)
         x_peak = self._db_to_x(self._peak_db, w)
+
+        # --- 背景帯 ---
+        self._canvas.create_rectangle(0, 0, x_green, h, fill=COLOR_BG_GREEN, outline="")
+        self._canvas.create_rectangle(x_green, 0, x_yellow, h, fill=COLOR_BG_YELLOW, outline="")
+        self._canvas.create_rectangle(x_yellow, 0, w, h, fill=COLOR_BG_RED, outline="")
 
         # --- アクティブレベル ---
         end_green = min(x_level, x_green)
@@ -157,7 +191,10 @@ class LevelMeter(ctk.CTkFrame):
 
         if x_level > x_green:
             end_yellow = min(x_level, x_yellow)
-            self._canvas.create_rectangle(x_green, 0, end_yellow, h, fill=COLOR_YELLOW, outline="")
+            if end_yellow > x_green:
+                self._canvas.create_rectangle(
+                    x_green, 0, end_yellow, h, fill=COLOR_YELLOW, outline=""
+                )
 
         if x_level > x_yellow:
             self._canvas.create_rectangle(x_yellow, 0, x_level, h, fill=COLOR_RED, outline="")
@@ -266,6 +303,9 @@ class SettingsWindow(ctk.CTkToplevel):
         self._stream = stream
 
         self._save_after_id: str | None = None
+        self._level_meter: LevelMeter | None = None
+        self._level_meter_card: ctk.CTkFrame | None = None
+        self._level_queue: queue.Queue[float] = level_queue
 
         self.title("Filtflow 設定")
         self.resizable(False, True)
@@ -281,7 +321,9 @@ class SettingsWindow(ctk.CTkToplevel):
 
         # --- レベルメーター ---
         meter_card = _section_frame(scroll, "レベルメーター")
-        LevelMeter(meter_card, level_queue).pack(fill="x", padx=6, pady=(0, 6))
+        self._level_meter_card = meter_card
+        self._level_meter = LevelMeter(meter_card, self._level_queue)
+        self._level_meter.pack(fill="x", padx=6, pady=(0, 6))
 
         # --- デバイス設定 ---
         dev_card = _section_frame(scroll, "デバイス設定")
@@ -530,6 +572,17 @@ class SettingsWindow(ctk.CTkToplevel):
         self._error_label = ctk.CTkLabel(scroll, text="", text_color="#ff6666")
         self._error_label.pack(fill="x", padx=8, pady=(0, 4))
 
+    def _rebuild_level_meter(self) -> None:
+        """Appearance 変更後にレベルメーターを作り直す。"""
+        if self._level_meter_card is None:
+            return
+
+        if self._level_meter is not None:
+            self._level_meter.destroy()
+
+        self._level_meter = LevelMeter(self._level_meter_card, self._level_queue)
+        self._level_meter.pack(fill="x", padx=6, pady=(0, 6))
+
     def _refresh_device_lists(self) -> None:
         """デバイス一覧を再取得してコンボボックスを更新する。"""
         in_names = [str(d["name"]) for d in list_input_devices()]
@@ -611,6 +664,10 @@ class SettingsWindow(ctk.CTkToplevel):
     def _on_appearance_change(self, mode: str) -> None:
         ctk.set_appearance_mode(mode)
         self._config.appearance_mode = mode.lower()
+
+        # Canvas はテーマ追従が不安定なので作り直す
+        self.after_idle(self._rebuild_level_meter)
+
         self._schedule_save()
 
     def _schedule_save(self) -> None:
