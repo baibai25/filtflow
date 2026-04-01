@@ -19,17 +19,35 @@ DEFAULT_BLOCK_SIZE: int = 480  # 10ms @ 48kHz
 DEFAULT_CHANNELS: int = 1
 
 
+def _get_wasapi_hostapi_index() -> int | None:
+    """WASAPI ホスト API のインデックスを返す。
+
+    Windows 以外など WASAPI が存在しない環境では None を返す。
+    """
+    for i, api in enumerate(sd.query_hostapis()):
+        if "WASAPI" in str(api.get("name", "")):
+            return i
+    return None
+
+
 def list_devices() -> list[dict[str, Any]]:
-    """入出力デバイス一覧を返す。
+    """WASAPI デバイス一覧を返す。
+
+    設計書「WASAPI ストリーム管理」に準拠し、WASAPI ホスト API のデバイスのみを返す。
+    WASAPI が利用不可の環境（非 Windows 等）ではすべてのデバイスを返す。
 
     Returns:
         sounddevice のデバイス情報 dict のリスト。
         各要素は "index", "name", "max_input_channels", "max_output_channels" を含む。
     """
+    wasapi_idx = _get_wasapi_hostapi_index()
     result: list[dict[str, Any]] = []
     for idx, dev in enumerate(sd.query_devices()):
         d = dict(dev)  # type: ignore[arg-type]
         d["index"] = idx
+        # WASAPI が利用可能な場合は WASAPI デバイスのみに絞る
+        if wasapi_idx is not None and int(d.get("hostapi", -1)) != wasapi_idx:
+            continue
         result.append(d)
     return result
 

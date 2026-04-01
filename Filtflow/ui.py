@@ -512,6 +512,9 @@ class SettingsWindow(tk.Toplevel):
     def _on_reset(self) -> None:
         """OBS デフォルト値を UI とフィルタに適用する。"""
         # Compressor
+        self._comp_enabled.set(True)
+        self._compressor.enabled = True
+        self._config.compressor.enabled = True
         self._comp_ratio.set(COMP_DEFAULT_RATIO)
         self._comp_threshold.set(COMP_DEFAULT_THRESHOLD_DB)
         self._comp_attack.set(float(COMP_DEFAULT_ATTACK_MS))
@@ -526,6 +529,9 @@ class SettingsWindow(tk.Toplevel):
         )
 
         # Expander
+        self._exp_enabled.set(True)
+        self._expander.enabled = True
+        self._config.expander.enabled = True
         self._exp_preset_var.set(PRESET_EXPANDER)
         self._exp_ratio.set(EXP_DEFAULT_RATIO)
         self._exp_threshold.set(EXP_DEFAULT_THRESHOLD_DB)
