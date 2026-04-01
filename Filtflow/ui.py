@@ -102,7 +102,7 @@ class LevelMeter(ctk.CTkFrame):
         self._current_mode: str = ""
 
         # ラベル行
-        header = ctk.CTkFrame(self, fg_color="transparent")
+        header = ctk.CTkFrame(self)
         header.pack(fill="x", padx=4, pady=(4, 0))
         ctk.CTkLabel(header, text="OUT", anchor="w", width=40).pack(side="left")
         self._label_peak = ctk.CTkLabel(
