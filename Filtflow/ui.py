@@ -259,7 +259,7 @@ class SettingsWindow(tk.Toplevel):
         self._refresh_device_lists()
 
     def _build_ui(self, level_queue: queue.Queue[float]) -> None:
-        pad = {"padx": 8, "pady": 4}
+        pad: dict[str, Any] = {"padx": 8, "pady": 4}
 
         # --- レベルメーター ---
         meter_frame = tk.LabelFrame(self, text="レベルメーター")

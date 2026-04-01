@@ -1,6 +1,6 @@
 """設定値の定義・ロード・保存（JSON）
 
-設定ファイルは %APPDATA%\Filtflow\config.json に保存される。
+設定ファイルは %APPDATA%/Filtflow/config.json に保存される。
 初回起動時は OBS デフォルト値で自動生成する。
 """
 
@@ -10,6 +10,7 @@ import json
 import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Any, cast
 
 CONFIG_DIR: Path = Path(os.environ.get("APPDATA", str(Path.home()))) / "Filtflow"
 CONFIG_FILE: Path = CONFIG_DIR / "config.json"
@@ -59,7 +60,7 @@ class Config:
             return cfg
 
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            data: dict[str, object] = json.load(f)
+            data = cast(dict[str, Any], json.load(f))
 
         cfg = cls()
         cfg.input_device_name = str(data.get("input_device_name", ""))

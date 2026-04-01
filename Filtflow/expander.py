@@ -100,22 +100,22 @@ class Expander:
         if "preset" in kwargs:
             self._preset = str(kwargs["preset"])
         if "ratio" in kwargs:
-            self._ratio = float(kwargs["ratio"])  # type: ignore[arg-type]
+            self._ratio = float(kwargs["ratio"])
             self._slope = 1.0 - self._ratio
         if "threshold" in kwargs:
-            self._threshold = float(kwargs["threshold"])  # type: ignore[arg-type]
+            self._threshold = float(kwargs["threshold"])
         if "attack_ms" in kwargs:
             self._attack_gain = _gain_coefficient(
                 self._sample_rate,
-                float(kwargs["attack_ms"]),  # type: ignore[arg-type]
+                float(kwargs["attack_ms"]),
             )
         if "release_ms" in kwargs:
             self._release_gain = _gain_coefficient(
                 self._sample_rate,
-                float(kwargs["release_ms"]),  # type: ignore[arg-type]
+                float(kwargs["release_ms"]),
             )
         if "output_gain_db" in kwargs:
-            self._output_gain = _db_to_mul(float(kwargs["output_gain_db"]))  # type: ignore[arg-type]
+            self._output_gain = _db_to_mul(float(kwargs["output_gain_db"]))
         if "detector" in kwargs:
             self._detector = str(kwargs["detector"])
 

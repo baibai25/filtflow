@@ -43,7 +43,7 @@ def list_devices() -> list[dict[str, Any]]:
     wasapi_idx = _get_wasapi_hostapi_index()
     result: list[dict[str, Any]] = []
     for idx, dev in enumerate(sd.query_devices()):
-        d = dict(dev)  # type: ignore[arg-type]
+        d = dict(dev)
         d["index"] = idx
         # WASAPI が利用可能な場合は WASAPI デバイスのみに絞る
         if wasapi_idx is not None and int(d.get("hostapi", -1)) != wasapi_idx:
