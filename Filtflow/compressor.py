@@ -81,9 +81,7 @@ class Compressor:
         if "attack_ms" in kwargs:
             self._attack_gain = _gain_coefficient(self._sample_rate, float(kwargs["attack_ms"]))
         if "release_ms" in kwargs:
-            self._release_gain = _gain_coefficient(
-                self._sample_rate, float(kwargs["release_ms"])
-            )
+            self._release_gain = _gain_coefficient(self._sample_rate, float(kwargs["release_ms"]))
         if "output_gain_db" in kwargs:
             self._output_gain = _db_to_mul(float(kwargs["output_gain_db"]))
 
@@ -111,13 +109,11 @@ class Compressor:
             # 上昇時は attack_gain、下降時は release_gain を使う
             if abs_sample >= self._envelope:
                 self._envelope = (
-                    self._attack_gain * self._envelope
-                    + (1.0 - self._attack_gain) * abs_sample
+                    self._attack_gain * self._envelope + (1.0 - self._attack_gain) * abs_sample
                 )
             else:
                 self._envelope = (
-                    self._release_gain * self._envelope
-                    + (1.0 - self._release_gain) * abs_sample
+                    self._release_gain * self._envelope + (1.0 - self._release_gain) * abs_sample
                 )
 
             # process_compression: ゲイン計算

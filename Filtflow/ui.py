@@ -58,8 +58,8 @@ from expander import (
 )
 
 # --- OBS 準拠レベルメーターの色しきい値 ---
-METER_GREEN_MAX_DB: float = -20.0   # -60 〜 -20 dBFS: 緑
-METER_YELLOW_MAX_DB: float = -9.0   # -20 〜 -9 dBFS:  黄
+METER_GREEN_MAX_DB: float = -20.0  # -60 〜 -20 dBFS: 緑
+METER_YELLOW_MAX_DB: float = -9.0  # -20 〜 -9 dBFS:  黄
 # -9 〜 0 dBFS: 赤
 COLOR_GREEN: str = "#00cc00"
 COLOR_YELLOW: str = "#ffff00"
@@ -89,9 +89,7 @@ class LevelMeter(tk.Frame):
         # ラベル行
         header = tk.Frame(self, bg=COLOR_BACKGROUND)
         header.pack(fill="x", padx=4, pady=(4, 0))
-        tk.Label(header, text="OUT", fg="white", bg=COLOR_BACKGROUND, width=4).pack(
-            side="left"
-        )
+        tk.Label(header, text="OUT", fg="white", bg=COLOR_BACKGROUND, width=4).pack(side="left")
         self._label_db = tk.Label(
             header, text="-60.0 dB", fg="white", bg=COLOR_BACKGROUND, width=10
         )
@@ -102,9 +100,7 @@ class LevelMeter(tk.Frame):
         self._label_peak.pack(side="right")
 
         # キャンバス（メーターバー）
-        self._canvas = tk.Canvas(
-            self, height=16, bg="#333333", highlightthickness=0
-        )
+        self._canvas = tk.Canvas(self, height=16, bg="#333333", highlightthickness=0)
         self._canvas.pack(fill="x", padx=4, pady=(2, 4))
 
         self._update()
@@ -153,7 +149,7 @@ class LevelMeter(tk.Frame):
             return
 
         # 区切り x 座標
-        x_green = self._db_to_x(METER_GREEN_MAX_DB, w)   # -20 dBFS
+        x_green = self._db_to_x(METER_GREEN_MAX_DB, w)  # -20 dBFS
         x_yellow = self._db_to_x(METER_YELLOW_MAX_DB, w)  # -9 dBFS
         x_level = self._db_to_x(self._level_db, w)
         x_peak = self._db_to_x(self._peak_db, w)
@@ -166,15 +162,11 @@ class LevelMeter(tk.Frame):
         # 黄区間
         if x_level > x_green:
             end_yellow = min(x_level, x_yellow)
-            self._canvas.create_rectangle(
-                x_green, 0, end_yellow, h, fill=COLOR_YELLOW, outline=""
-            )
+            self._canvas.create_rectangle(x_green, 0, end_yellow, h, fill=COLOR_YELLOW, outline="")
 
         # 赤区間
         if x_level > x_yellow:
-            self._canvas.create_rectangle(
-                x_yellow, 0, x_level, h, fill=COLOR_RED, outline=""
-            )
+            self._canvas.create_rectangle(x_yellow, 0, x_level, h, fill=COLOR_RED, outline="")
 
         # ピーク線
         if 0 < x_peak < w:
@@ -304,41 +296,68 @@ class SettingsWindow(tk.Toplevel):
 
         self._comp_enabled = tk.BooleanVar(value=self._config.compressor.enabled)
         tk.Checkbutton(
-            comp_frame, text="有効", variable=self._comp_enabled,
+            comp_frame,
+            text="有効",
+            variable=self._comp_enabled,
             command=self._on_comp_enabled_change,
         ).pack(anchor="e", padx=6)
 
         self._comp_ratio = _SliderRow(
-            comp_frame, "Ratio", COMP_MIN_RATIO, COMP_MAX_RATIO, 0.5,
-            self._config.compressor.ratio, ":1",
+            comp_frame,
+            "Ratio",
+            COMP_MIN_RATIO,
+            COMP_MAX_RATIO,
+            0.5,
+            self._config.compressor.ratio,
+            ":1",
             lambda v: self._compressor.update_params(ratio=v),
         )
         self._comp_ratio.pack(fill="x", padx=6, pady=1)
 
         self._comp_threshold = _SliderRow(
-            comp_frame, "Threshold", COMP_MIN_THRESHOLD_DB, 0.0, 0.5,
-            self._config.compressor.threshold_db, "dB",
+            comp_frame,
+            "Threshold",
+            COMP_MIN_THRESHOLD_DB,
+            0.0,
+            0.5,
+            self._config.compressor.threshold_db,
+            "dB",
             lambda v: self._compressor.update_params(threshold=v),
         )
         self._comp_threshold.pack(fill="x", padx=6, pady=1)
 
         self._comp_attack = _SliderRow(
-            comp_frame, "Attack", COMP_MIN_ATK_RLS_MS, COMP_MAX_ATK_MS, 1,
-            self._config.compressor.attack_ms, "ms",
+            comp_frame,
+            "Attack",
+            COMP_MIN_ATK_RLS_MS,
+            COMP_MAX_ATK_MS,
+            1,
+            self._config.compressor.attack_ms,
+            "ms",
             lambda v: self._compressor.update_params(attack_ms=int(v)),
         )
         self._comp_attack.pack(fill="x", padx=6, pady=1)
 
         self._comp_release = _SliderRow(
-            comp_frame, "Release", COMP_MIN_ATK_RLS_MS, COMP_MAX_RLS_MS, 5,
-            self._config.compressor.release_ms, "ms",
+            comp_frame,
+            "Release",
+            COMP_MIN_ATK_RLS_MS,
+            COMP_MAX_RLS_MS,
+            5,
+            self._config.compressor.release_ms,
+            "ms",
             lambda v: self._compressor.update_params(release_ms=int(v)),
         )
         self._comp_release.pack(fill="x", padx=6, pady=1)
 
         self._comp_output_gain = _SliderRow(
-            comp_frame, "Output Gain", COMP_MIN_OUTPUT_GAIN, COMP_MAX_OUTPUT_GAIN, 0.5,
-            self._config.compressor.output_gain_db, "dB",
+            comp_frame,
+            "Output Gain",
+            COMP_MIN_OUTPUT_GAIN,
+            COMP_MAX_OUTPUT_GAIN,
+            0.5,
+            self._config.compressor.output_gain_db,
+            "dB",
             lambda v: self._compressor.update_params(output_gain_db=v),
         )
         self._comp_output_gain.pack(fill="x", padx=6, pady=1)
@@ -349,7 +368,9 @@ class SettingsWindow(tk.Toplevel):
 
         self._exp_enabled = tk.BooleanVar(value=self._config.expander.enabled)
         tk.Checkbutton(
-            exp_frame, text="有効", variable=self._exp_enabled,
+            exp_frame,
+            text="有効",
+            variable=self._exp_enabled,
             command=self._on_exp_enabled_change,
         ).pack(anchor="e", padx=6)
 
@@ -358,42 +379,70 @@ class SettingsWindow(tk.Toplevel):
         tk.Label(preset_row, text="Preset", width=14, anchor="w").pack(side="left")
         self._exp_preset_var = tk.StringVar(value=self._config.expander.preset)
         ttk.Combobox(
-            preset_row, textvariable=self._exp_preset_var,
-            values=[PRESET_EXPANDER, PRESET_GATE], width=12, state="readonly",
+            preset_row,
+            textvariable=self._exp_preset_var,
+            values=[PRESET_EXPANDER, PRESET_GATE],
+            width=12,
+            state="readonly",
         ).pack(side="left")
         self._exp_preset_var.trace_add("write", self._on_preset_change)
 
         self._exp_ratio = _SliderRow(
-            exp_frame, "Ratio", EXP_MIN_RATIO, EXP_MAX_RATIO, 0.5,
-            self._config.expander.ratio, ":1",
+            exp_frame,
+            "Ratio",
+            EXP_MIN_RATIO,
+            EXP_MAX_RATIO,
+            0.5,
+            self._config.expander.ratio,
+            ":1",
             lambda v: self._expander.update_params(ratio=v),
         )
         self._exp_ratio.pack(fill="x", padx=6, pady=1)
 
         self._exp_threshold = _SliderRow(
-            exp_frame, "Threshold", EXP_MIN_THRESHOLD_DB, 0.0, 0.5,
-            self._config.expander.threshold_db, "dB",
+            exp_frame,
+            "Threshold",
+            EXP_MIN_THRESHOLD_DB,
+            0.0,
+            0.5,
+            self._config.expander.threshold_db,
+            "dB",
             lambda v: self._expander.update_params(threshold=v),
         )
         self._exp_threshold.pack(fill="x", padx=6, pady=1)
 
         self._exp_attack = _SliderRow(
-            exp_frame, "Attack", EXP_MIN_ATK_RLS_MS, EXP_MAX_ATK_MS, 1,
-            self._config.expander.attack_ms, "ms",
+            exp_frame,
+            "Attack",
+            EXP_MIN_ATK_RLS_MS,
+            EXP_MAX_ATK_MS,
+            1,
+            self._config.expander.attack_ms,
+            "ms",
             lambda v: self._expander.update_params(attack_ms=int(v)),
         )
         self._exp_attack.pack(fill="x", padx=6, pady=1)
 
         self._exp_release = _SliderRow(
-            exp_frame, "Release", EXP_MIN_ATK_RLS_MS, EXP_MAX_RLS_MS, 5,
-            self._config.expander.release_ms, "ms",
+            exp_frame,
+            "Release",
+            EXP_MIN_ATK_RLS_MS,
+            EXP_MAX_RLS_MS,
+            5,
+            self._config.expander.release_ms,
+            "ms",
             lambda v: self._expander.update_params(release_ms=int(v)),
         )
         self._exp_release.pack(fill="x", padx=6, pady=1)
 
         self._exp_output_gain = _SliderRow(
-            exp_frame, "Output Gain", EXP_MIN_OUTPUT_GAIN, EXP_MAX_OUTPUT_GAIN, 0.5,
-            self._config.expander.output_gain_db, "dB",
+            exp_frame,
+            "Output Gain",
+            EXP_MIN_OUTPUT_GAIN,
+            EXP_MAX_OUTPUT_GAIN,
+            0.5,
+            self._config.expander.output_gain_db,
+            "dB",
             lambda v: self._expander.update_params(output_gain_db=v),
         )
         self._exp_output_gain.pack(fill="x", padx=6, pady=1)
@@ -403,20 +452,21 @@ class SettingsWindow(tk.Toplevel):
         tk.Label(detector_row, text="Detector", width=14, anchor="w").pack(side="left")
         self._exp_detector_var = tk.StringVar(value=self._config.expander.detector)
         ttk.Combobox(
-            detector_row, textvariable=self._exp_detector_var,
-            values=[DETECTOR_RMS, DETECTOR_PEAK], width=12, state="readonly",
+            detector_row,
+            textvariable=self._exp_detector_var,
+            values=[DETECTOR_RMS, DETECTOR_PEAK],
+            width=12,
+            state="readonly",
         ).pack(side="left")
         self._exp_detector_var.trace_add("write", self._on_detector_change)
 
         # --- ボタン行 ---
         btn_frame = tk.Frame(self)
         btn_frame.pack(fill="x", **pad)
-        tk.Button(btn_frame, text="保存", width=12, command=self._on_save).pack(
+        tk.Button(btn_frame, text="保存", width=12, command=self._on_save).pack(side="left", padx=4)
+        tk.Button(btn_frame, text="デフォルトに戻す", width=16, command=self._on_reset).pack(
             side="left", padx=4
         )
-        tk.Button(
-            btn_frame, text="デフォルトに戻す", width=16, command=self._on_reset
-        ).pack(side="left", padx=4)
 
         # --- エラー表示ラベル ---
         self._error_label = tk.Label(self, text="", fg="red")

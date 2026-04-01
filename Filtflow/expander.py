@@ -106,11 +106,13 @@ class Expander:
             self._threshold = float(kwargs["threshold"])  # type: ignore[arg-type]
         if "attack_ms" in kwargs:
             self._attack_gain = _gain_coefficient(
-                self._sample_rate, float(kwargs["attack_ms"])  # type: ignore[arg-type]
+                self._sample_rate,
+                float(kwargs["attack_ms"]),  # type: ignore[arg-type]
             )
         if "release_ms" in kwargs:
             self._release_gain = _gain_coefficient(
-                self._sample_rate, float(kwargs["release_ms"])  # type: ignore[arg-type]
+                self._sample_rate,
+                float(kwargs["release_ms"]),  # type: ignore[arg-type]
             )
         if "output_gain_db" in kwargs:
             self._output_gain = _db_to_mul(float(kwargs["output_gain_db"]))  # type: ignore[arg-type]
@@ -148,13 +150,11 @@ class Expander:
         # gain_db > 前回値 (減衰から回復) → release_gain で戻す
         if target_gain_db < self._gain_db:
             self._gain_db = (
-                self._attack_gain * self._gain_db
-                + (1.0 - self._attack_gain) * target_gain_db
+                self._attack_gain * self._gain_db + (1.0 - self._attack_gain) * target_gain_db
             )
         else:
             self._gain_db = (
-                self._release_gain * self._gain_db
-                + (1.0 - self._release_gain) * target_gain_db
+                self._release_gain * self._gain_db + (1.0 - self._release_gain) * target_gain_db
             )
 
         return self._gain_db

@@ -19,7 +19,6 @@ import tkinter as tk
 from typing import Callable
 
 import numpy as np
-
 from audio_stream import AudioStream, find_device_index
 from compressor import Compressor
 from config import Config
@@ -97,7 +96,7 @@ def main() -> None:
 
     # 終了フラグ・再接続中フラグ・エラーメッセージ（list で可変にして内側関数から参照する）
     _quitting: list[bool] = [False]
-    _reconnecting: list[bool] = [False]   # 再試行タイマーがすでにキューにあるか
+    _reconnecting: list[bool] = [False]  # 再試行タイマーがすでにキューにあるか
     _stream_error: list[str | None] = [None]  # 最新のストリームエラーメッセージ
 
     def open_settings() -> None:

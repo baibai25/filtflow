@@ -81,9 +81,7 @@ class TrayIcon:
             menu=menu,
         )
 
-    def _handle_open_settings(
-        self, icon: pystray.Icon, item: pystray.MenuItem
-    ) -> None:
+    def _handle_open_settings(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         self._on_open_settings()
 
     def _handle_quit(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
