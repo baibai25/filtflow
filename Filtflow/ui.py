@@ -291,6 +291,8 @@ class SettingsWindow(ctk.CTkToplevel):
         self._expander = expander
         self._stream = stream
 
+        self._save_after_id: str | None = None
+
         self.title("Filtflow 設定")
         self.resizable(False, True)
         self.minsize(560, 400)
@@ -378,7 +380,7 @@ class SettingsWindow(ctk.CTkToplevel):
             0.5,
             self._config.compressor.ratio,
             ":1",
-            lambda v: self._compressor.update_params(ratio=v),
+            lambda v: (self._compressor.update_params(ratio=v), self._schedule_save()),
         )
         self._comp_ratio.pack(fill="x", padx=6, pady=1)
 
@@ -390,7 +392,7 @@ class SettingsWindow(ctk.CTkToplevel):
             0.5,
             self._config.compressor.threshold_db,
             "dB",
-            lambda v: self._compressor.update_params(threshold=v),
+            lambda v: (self._compressor.update_params(threshold=v), self._schedule_save()),
         )
         self._comp_threshold.pack(fill="x", padx=6, pady=1)
 
@@ -402,7 +404,7 @@ class SettingsWindow(ctk.CTkToplevel):
             1,
             self._config.compressor.attack_ms,
             "ms",
-            lambda v: self._compressor.update_params(attack_ms=int(v)),
+            lambda v: (self._compressor.update_params(attack_ms=int(v)), self._schedule_save()),
         )
         self._comp_attack.pack(fill="x", padx=6, pady=1)
 
@@ -414,7 +416,7 @@ class SettingsWindow(ctk.CTkToplevel):
             5,
             self._config.compressor.release_ms,
             "ms",
-            lambda v: self._compressor.update_params(release_ms=int(v)),
+            lambda v: (self._compressor.update_params(release_ms=int(v)), self._schedule_save()),
         )
         self._comp_release.pack(fill="x", padx=6, pady=1)
 
@@ -426,7 +428,7 @@ class SettingsWindow(ctk.CTkToplevel):
             0.5,
             self._config.compressor.output_gain_db,
             "dB",
-            lambda v: self._compressor.update_params(output_gain_db=v),
+            lambda v: (self._compressor.update_params(output_gain_db=v), self._schedule_save()),
         )
         self._comp_output_gain.pack(fill="x", padx=6, pady=(1, 8))
 
@@ -464,7 +466,7 @@ class SettingsWindow(ctk.CTkToplevel):
             0.5,
             self._config.expander.ratio,
             ":1",
-            lambda v: self._expander.update_params(ratio=v),
+            lambda v: (self._expander.update_params(ratio=v), self._schedule_save()),
         )
         self._exp_ratio.pack(fill="x", padx=6, pady=1)
 
@@ -476,7 +478,7 @@ class SettingsWindow(ctk.CTkToplevel):
             0.5,
             self._config.expander.threshold_db,
             "dB",
-            lambda v: self._expander.update_params(threshold=v),
+            lambda v: (self._expander.update_params(threshold=v), self._schedule_save()),
         )
         self._exp_threshold.pack(fill="x", padx=6, pady=1)
 
@@ -488,7 +490,7 @@ class SettingsWindow(ctk.CTkToplevel):
             1,
             self._config.expander.attack_ms,
             "ms",
-            lambda v: self._expander.update_params(attack_ms=int(v)),
+            lambda v: (self._expander.update_params(attack_ms=int(v)), self._schedule_save()),
         )
         self._exp_attack.pack(fill="x", padx=6, pady=1)
 
@@ -500,7 +502,7 @@ class SettingsWindow(ctk.CTkToplevel):
             5,
             self._config.expander.release_ms,
             "ms",
-            lambda v: self._expander.update_params(release_ms=int(v)),
+            lambda v: (self._expander.update_params(release_ms=int(v)), self._schedule_save()),
         )
         self._exp_release.pack(fill="x", padx=6, pady=1)
 
@@ -512,7 +514,7 @@ class SettingsWindow(ctk.CTkToplevel):
             0.5,
             self._config.expander.output_gain_db,
             "dB",
-            lambda v: self._expander.update_params(output_gain_db=v),
+            lambda v: (self._expander.update_params(output_gain_db=v), self._schedule_save()),
         )
         self._exp_output_gain.pack(fill="x", padx=6, pady=1)
 
@@ -532,9 +534,6 @@ class SettingsWindow(ctk.CTkToplevel):
         # --- ボタン行 ---
         btn_frame = ctk.CTkFrame(scroll, fg_color="transparent")
         btn_frame.pack(fill="x", padx=8, pady=4)
-        ctk.CTkButton(btn_frame, text="保存", width=100, command=self._on_save).pack(
-            side="left", padx=4
-        )
         ctk.CTkButton(
             btn_frame,
             text="デフォルトに戻す",
@@ -588,6 +587,7 @@ class SettingsWindow(ctk.CTkToplevel):
             self.clear_error()
         except Exception as exc:
             self.show_error(f"デバイスエラー: {exc}")
+        self._schedule_save()
 
     def _on_block_size_change(self) -> None:
         block_size = int(self._block_size_var.get())
@@ -597,16 +597,19 @@ class SettingsWindow(ctk.CTkToplevel):
             self.clear_error()
         except Exception as exc:
             self.show_error(f"デバイスエラー: {exc}")
+        self._schedule_save()
 
     def _on_comp_enabled_change(self) -> None:
         enabled = self._comp_enabled.get()
         self._config.compressor.enabled = enabled
         self._compressor.enabled = enabled
+        self._schedule_save()
 
     def _on_exp_enabled_change(self) -> None:
         enabled = self._exp_enabled.get()
         self._config.expander.enabled = enabled
         self._expander.enabled = enabled
+        self._schedule_save()
 
     def _on_preset_change(self) -> None:
         preset = self._exp_preset_var.get()
@@ -623,22 +626,29 @@ class SettingsWindow(ctk.CTkToplevel):
         self._exp_ratio.set(ratio)
         self._exp_release.set(float(release_ms))
         self._expander.update_params(ratio=ratio, release_ms=release_ms)
+        self._schedule_save()
 
     def _on_detector_change(self) -> None:
         detector = self._exp_detector_var.get()
         self._expander.update_params(detector=detector)
         self._config.expander.detector = detector
+        self._schedule_save()
 
     def _on_appearance_change(self, mode: str) -> None:
         ctk.set_appearance_mode(mode)
         self._config.appearance_mode = mode.lower()
-        try:
-            self._config.save()
-        except Exception:
-            pass
+        self._schedule_save()
 
-    def _on_save(self) -> None:
+    def _schedule_save(self) -> None:
+        """500ms デバウンスで _do_save を呼ぶ。連続操作中は延期する。"""
+        if self._save_after_id is not None:
+            self.after_cancel(self._save_after_id)
+        self._save_after_id = self.after(500, self._do_save)
+
+    def _do_save(self) -> None:
         """現在の UI 値を config に反映して JSON 保存する。"""
+        self._save_after_id = None
+
         c = self._config.compressor
         c.enabled = self._comp_enabled.get()
         c.ratio = self._comp_ratio.get()
@@ -702,3 +712,4 @@ class SettingsWindow(ctk.CTkToplevel):
             output_gain_db=EXP_DEFAULT_OUTPUT_GAIN_DB,
             detector=DETECTOR_RMS,
         )
+        self._schedule_save()
