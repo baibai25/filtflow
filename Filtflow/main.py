@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import queue
 import sys
+from pathlib import Path
 from typing import Callable
 
 import numpy as np
@@ -24,6 +25,7 @@ from compressor import Compressor
 from config import Config
 from expander import Expander
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from tray import TrayIcon
 from ui import SettingsWindow, apply_appearance_mode
@@ -58,6 +60,8 @@ def main() -> None:
     app = QApplication(sys.argv)
     # 最後のウィンドウを閉じてもイベントループを継続（トレイ常駐のため）
     app.setQuitOnLastWindowClosed(False)
+    # ウィンドウタイトルバーのアイコンを設定
+    app.setWindowIcon(QIcon(str(Path(__file__).parent / "assets" / "icon.png")))
 
     # --- 設定ロード ---
     config = Config.load()
