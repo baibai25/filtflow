@@ -53,7 +53,7 @@ def _build_filter_chain(
     expander: Expander,
 ) -> list[Callable[[np.ndarray], np.ndarray]]:
     """両フィルタを常にチェーンに含める。有効/無効は各フィルタの enabled フラグで制御する。"""
-    return [compressor.process, expander.process]
+    return [expander.process, compressor.process]
 
 
 def main() -> None:
