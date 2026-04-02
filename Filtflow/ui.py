@@ -909,7 +909,6 @@ class SettingsWindow(QWidget):
 
         # 左ペイン選択 → 右ペインページ切り替え
         self._filter_list.currentRowChanged.connect(self._filter_stack.setCurrentIndex)
-        self._filter_list.setCurrentRow(0)
 
         filter_split.addWidget(self._filter_stack, 1)
 
@@ -921,6 +920,13 @@ class SettingsWindow(QWidget):
         filter_group_layout.addWidget(self._error_label)
 
         main_layout.addWidget(filter_group, 1)  # stretch=1 で残り領域を占有
+
+        # --- 初期選択（レイアウト構築完了後に行う） ---
+        # QStackedWidget のデフォルトページを明示的に設定し、
+        # QListWidget の選択と同期させる。シグナルだけに頼ると
+        # currentRow が既に 0 の場合に currentRowChanged が発火しない。
+        self._filter_stack.setCurrentIndex(0)
+        self._filter_list.setCurrentRow(0)
 
     @staticmethod
     def _refresh_combo(combo: QComboBox, items: list[str], current: str) -> None:
