@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv remove:*)",
+      "Bash(python Filtflow/assets/create_icons.py)"
+    ]
+  }
+}

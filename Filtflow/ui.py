@@ -11,34 +11,6 @@ import queue
 from typing import Callable
 
 import qdarktheme
-
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import (
-    QCloseEvent,
-    QColor,
-    QFont,
-    QFontMetrics,
-    QPaintEvent,
-    QPainter,
-    QPen,
-)
-from PySide6.QtWidgets import (
-    QApplication,
-    QButtonGroup,
-    QCheckBox,
-    QComboBox,
-    QFrame,
-    QGridLayout,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QScrollArea,
-    QSlider,
-    QVBoxLayout,
-    QWidget,
-)
-
 from audio_stream import (
     AudioStream,
     find_device_index,
@@ -84,6 +56,43 @@ from expander import (
     PRESET_GATE,
     Expander,
 )
+from PySide6.QtCore import (
+    Property,
+    QEasingCurve,
+    QPropertyAnimation,
+    QSize,
+    Qt,
+    QTimer,
+    Signal,
+)
+from PySide6.QtGui import (
+    QBrush,
+    QCloseEvent,
+    QColor,
+    QFont,
+    QFontMetrics,
+    QMouseEvent,
+    QPainter,
+    QPaintEvent,
+    QPen,
+)
+from PySide6.QtWidgets import (
+    QAbstractScrollArea,
+    QApplication,
+    QButtonGroup,
+    QComboBox,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QSlider,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 # --- OBS 準拠レベルメーターの色しきい値 ---
 METER_GREEN_MAX_DB: float = -20.0  # -60 〜 -20 dBFS: 緑
@@ -103,11 +112,14 @@ METER_MAX_DB: float = 0.0
 METER_UPDATE_MS: int = 30
 PEAK_HOLD_SEC: float = 2.0
 
-METER_BAR_HEIGHT: int = 12
-METER_SCALE_HEIGHT: int = 22
+METER_BAR_HEIGHT: int = 10
+METER_SCALE_HEIGHT: int = 18
 METER_TICK_MARKS: list[float] = [-60.0, -50.0, -40.0, -30.0, -20.0, -10.0, 0.0]
 
 BLOCK_SIZE_OPTIONS: list[str] = ["128", "256", "480", "512", "960", "1024"]
+
+# フィルタ名ラベルの無効時スタイル
+_FILTER_DISABLED_STYLE: str = "color: palette(mid); text-decoration: line-through;"
 
 # グレーアウトテキスト用スタイルシート（範囲表示・補助ラベル等）
 # palette(mid) はテーマに追従するため、ダーク・ライト問わず適切なコントラストになる
@@ -167,6 +179,132 @@ def apply_appearance_mode(mode: str) -> None:
 
     _applied_appearance_mode = normalized
     qdarktheme.setup_theme(normalized)
+
+
+# ---------------------------------------------------------------------------
+# iOS / Android 風トグルスイッチ
+# ---------------------------------------------------------------------------
+
+# トグルスイッチのサイズ定数
+_TOGGLE_WIDTH: int = 34
+_TOGGLE_HEIGHT: int = 18
+_TOGGLE_KNOB_MARGIN: int = 2
+
+
+class ToggleSwitch(QWidget):
+    """iOS/Android 風の pill-shaped トグルスイッチ。
+
+    QWidget を継承し QPainter で描画する。QAbstractButton を使わないことで
+    qdarktheme のグローバルスタイルシートによるボタン背景の上書きを回避する。
+    isChecked() / setChecked() / toggled シグナルを自前で提供する。
+    """
+
+    toggled = Signal(bool)
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._checked: bool = False
+        self.setFixedSize(_TOGGLE_WIDTH, _TOGGLE_HEIGHT)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        # ノブの X 位置（アニメーション用プロパティ）
+        self._knob_x: float = float(_TOGGLE_KNOB_MARGIN)
+        self._animation = QPropertyAnimation(self, b"knob_x", self)
+        self._animation.setDuration(120)
+        self._animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
+
+    # -- public API (QCheckBox 互換) ----------------------------------------
+
+    def isChecked(self) -> bool:  # noqa: N802
+        return self._checked
+
+    def setChecked(self, checked: bool) -> None:  # noqa: N802
+        """チェック状態を設定する（アニメーションなし・シグナル発火あり）。"""
+        if self._checked == checked:
+            return
+        self._checked = checked
+        knob_d = _TOGGLE_HEIGHT - 2 * _TOGGLE_KNOB_MARGIN
+        self._knob_x = (
+            float(_TOGGLE_WIDTH - _TOGGLE_KNOB_MARGIN - knob_d)
+            if checked
+            else float(_TOGGLE_KNOB_MARGIN)
+        )
+        self.update()
+        self.toggled.emit(checked)
+
+    # -- Qt property for animation ------------------------------------------
+
+    def _get_knob_x(self) -> float:
+        return self._knob_x
+
+    def _set_knob_x(self, value: float) -> None:
+        self._knob_x = value
+        self.update()
+
+    knob_x = Property(float, _get_knob_x, _set_knob_x)
+
+    # -- size hints ---------------------------------------------------------
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        return QSize(_TOGGLE_WIDTH, _TOGGLE_HEIGHT)
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        return self.sizeHint()
+
+    # -- click handling -----------------------------------------------------
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._toggle_with_animation()
+        super().mousePressEvent(event)
+
+    def _toggle_with_animation(self) -> None:
+        new_checked = not self._checked
+        self._checked = new_checked
+        # アニメーション開始
+        self._animation.stop()
+        knob_d = _TOGGLE_HEIGHT - 2 * _TOGGLE_KNOB_MARGIN
+        end = (
+            float(_TOGGLE_WIDTH - _TOGGLE_KNOB_MARGIN - knob_d)
+            if new_checked
+            else float(_TOGGLE_KNOB_MARGIN)
+        )
+        self._animation.setStartValue(self._knob_x)
+        self._animation.setEndValue(end)
+        self._animation.start()
+        self.toggled.emit(new_checked)
+
+    # -- painting -----------------------------------------------------------
+
+    def paintEvent(self, _event: QPaintEvent) -> None:  # noqa: N802
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        knob_d = _TOGGLE_HEIGHT - 2 * _TOGGLE_KNOB_MARGIN
+
+        # Track
+        track_color = QColor("#4a9f4a") if self._checked else QColor("#888888")
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(track_color))
+        p.drawRoundedRect(
+            0,
+            0,
+            _TOGGLE_WIDTH,
+            _TOGGLE_HEIGHT,
+            _TOGGLE_HEIGHT / 2,
+            _TOGGLE_HEIGHT / 2,
+        )
+
+        # Knob
+        p.setPen(QPen(QColor("#b0b0b0"), 1))
+        p.setBrush(QBrush(QColor("#ffffff")))
+        p.drawEllipse(
+            int(self._knob_x),
+            _TOGGLE_KNOB_MARGIN,
+            knob_d,
+            knob_d,
+        )
+
+        p.end()
 
 
 class _MeterBar(QWidget):
@@ -367,25 +505,20 @@ class _SliderRow(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         lbl = QLabel(label)
-        lbl.setFixedWidth(110)
+        lbl.setFixedWidth(90)
         layout.addWidget(lbl)
 
         self._slider = QSlider(Qt.Orientation.Horizontal)
         self._slider.setRange(0, steps)
-        self._slider.setFixedWidth(200)
+        self._slider.setMinimumWidth(80)
         self._slider.setValue(self._to_int(initial))
         self._slider.valueChanged.connect(self._on_slider_changed)
-        layout.addWidget(self._slider)
+        layout.addWidget(self._slider, 1)  # stretch=1 で残り幅を埋める
 
         self._val_label = QLabel(self._format(initial))
-        self._val_label.setFixedWidth(90)
+        self._val_label.setFixedWidth(75)
+        self._val_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(self._val_label)
-
-        range_text = f"({from_:.0f}–{to:.0f} {unit})"
-        range_lbl = QLabel(range_text)
-        range_lbl.setStyleSheet(_MUTED_STYLE)
-        layout.addWidget(range_lbl)
-        layout.addStretch()
 
     def _to_int(self, value: float) -> int:
         return int(round((value - self._from) / self._resolution))
@@ -422,15 +555,13 @@ def _build_labeled_combo_row(
     layout = QHBoxLayout(row)
     layout.setContentsMargins(0, 0, 0, 0)
     lbl = QLabel(label)
-    lbl.setFixedWidth(110)
+    lbl.setFixedWidth(90)
     layout.addWidget(lbl)
     combo = QComboBox()
     combo.addItems(items)
     combo.setCurrentText(current)
-    combo.setFixedWidth(140)
     combo.currentTextChanged.connect(lambda _text: on_change())
-    layout.addWidget(combo)
-    layout.addStretch()
+    layout.addWidget(combo, 1)  # 残り幅を埋める
     return row, combo
 
 
@@ -461,8 +592,8 @@ class SettingsWindow(QWidget):
         self._save_timer.timeout.connect(self._do_save)
 
         self.setWindowTitle("Filtflow Settings")
-        self.setMinimumSize(600, 400)
-        self.resize(600, 880)
+        self.setMinimumSize(580, 480)
+        self.resize(620, 650)
 
         self._build_ui(level_queue)
         self._refresh_device_lists()
@@ -475,6 +606,7 @@ class SettingsWindow(QWidget):
     def _build_ui(self, level_queue: queue.Queue[float]) -> None:
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(4, 4, 4, 4)
+        main_layout.setSpacing(4)
 
         # --- 右上の外観切り替えトグル ---
         header = QWidget()
@@ -507,49 +639,33 @@ class SettingsWindow(QWidget):
         header_layout.addWidget(self._light_btn)
         main_layout.addWidget(header)
 
-        scroll_area = QScrollArea(self)
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
-        main_layout.addWidget(scroll_area)
-
-        container = QWidget()
-        scroll_layout = QVBoxLayout(container)
-        scroll_layout.setContentsMargins(4, 4, 4, 4)
-        scroll_layout.setSpacing(4)
-        scroll_area.setWidget(container)
-
-        # --- Level Meter ---
+        # --- 上部: Level Meter ---
         meter_group = QGroupBox("Level Meter")
-        scroll_layout.addWidget(meter_group)
         meter_layout = QVBoxLayout(meter_group)
         meter_layout.setContentsMargins(6, 6, 6, 6)
         meter_layout.addWidget(LevelMeter(meter_group, level_queue))
+        main_layout.addWidget(meter_group)
+        main_layout.addSpacing(6)
 
-        # --- Device ---
+        # --- 上部: Device ---
         dev_group = QGroupBox("Device")
-        scroll_layout.addWidget(dev_group)
         dev_layout = QVBoxLayout(dev_group)
         dev_layout.setContentsMargins(6, 6, 6, 8)
 
         dev_grid = QWidget()
         grid = QGridLayout(dev_grid)
         grid.setContentsMargins(0, 0, 0, 0)
+        grid.setColumnStretch(1, 1)  # コンボボックス列が残り幅を埋める
         dev_layout.addWidget(dev_grid)
 
         grid.addWidget(QLabel("Input Device:"), 0, 0)
         self._input_combo = QComboBox()
-        self._input_combo.setMinimumWidth(330)
-        self._input_combo.currentIndexChanged.connect(
-            lambda _idx: self._on_device_change()
-        )
+        self._input_combo.currentIndexChanged.connect(lambda _idx: self._on_device_change())
         grid.addWidget(self._input_combo, 0, 1, 1, 2)
 
         grid.addWidget(QLabel("Output Device:"), 1, 0)
         self._output_combo = QComboBox()
-        self._output_combo.setMinimumWidth(330)
-        self._output_combo.currentIndexChanged.connect(
-            lambda _idx: self._on_device_change()
-        )
+        self._output_combo.currentIndexChanged.connect(lambda _idx: self._on_device_change())
         grid.addWidget(self._output_combo, 1, 1, 1, 2)
 
         grid.addWidget(QLabel("Block Size:"), 2, 0)
@@ -564,113 +680,78 @@ class SettingsWindow(QWidget):
         samples_lbl = QLabel("samples")
         samples_lbl.setStyleSheet(_MUTED_STYLE)
         grid.addWidget(samples_lbl, 2, 2)
+        main_layout.addWidget(dev_group)
+        main_layout.addSpacing(6)
 
-        # --- Compressor ---
-        comp_group = QGroupBox("Compressor")
-        scroll_layout.addWidget(comp_group)
-        comp_layout = QVBoxLayout(comp_group)
-        comp_layout.setContentsMargins(6, 4, 6, 8)
-        comp_layout.setSpacing(2)
+        # --- 下部メイン: フィルタ選択 + 詳細編集 (OBSスタイル) ---
+        filter_group = QGroupBox("Audio Filters")
+        filter_group_layout = QVBoxLayout(filter_group)
+        filter_group_layout.setContentsMargins(6, 6, 6, 6)
 
-        comp_top = QWidget()
-        comp_top_layout = QHBoxLayout(comp_top)
-        comp_top_layout.setContentsMargins(0, 0, 0, 0)
-        comp_top_layout.addStretch()
-        self._comp_enabled = QCheckBox("Enable")
-        self._comp_enabled.setChecked(self._config.compressor.enabled)
-        self._comp_enabled.stateChanged.connect(
-            lambda _state: self._on_comp_enabled_change()
-        )
-        comp_top_layout.addWidget(self._comp_enabled)
-        comp_layout.addWidget(comp_top)
+        filter_split = QHBoxLayout()
 
-        self._comp_ratio = _SliderRow(
-            comp_group,
-            "Ratio",
-            COMP_MIN_RATIO,
-            COMP_MAX_RATIO,
-            0.5,
-            self._config.compressor.ratio,
-            ":1",
-            lambda v: (self._compressor.update_params(ratio=v), self._schedule_save()),
-        )
-        comp_layout.addWidget(self._comp_ratio)
+        # === 左ペイン: フィルタ一覧 ===
+        left_pane = QWidget()
+        left_pane.setFixedWidth(180)
+        left_layout = QVBoxLayout(left_pane)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(4)
 
-        self._comp_threshold = _SliderRow(
-            comp_group,
-            "Threshold",
-            COMP_MIN_THRESHOLD_DB,
-            0.0,
-            0.5,
-            self._config.compressor.threshold_db,
-            "dB",
-            lambda v: (self._compressor.update_params(threshold=v), self._schedule_save()),
-        )
-        comp_layout.addWidget(self._comp_threshold)
+        self._filter_list = QListWidget()
+        self._filter_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._filter_list.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents)
 
-        self._comp_attack = _SliderRow(
-            comp_group,
-            "Attack",
-            COMP_MIN_ATK_RLS_MS,
-            COMP_MAX_ATK_MS,
-            1,
-            self._config.compressor.attack_ms,
-            "ms",
-            lambda v: (self._compressor.update_params(attack_ms=int(v)), self._schedule_save()),
-        )
-        comp_layout.addWidget(self._comp_attack)
-
-        self._comp_release = _SliderRow(
-            comp_group,
-            "Release",
-            5,
-            COMP_MAX_RLS_MS,
-            5,
-            self._config.compressor.release_ms,
-            "ms",
-            lambda v: (self._compressor.update_params(release_ms=int(v)), self._schedule_save()),
-        )
-        comp_layout.addWidget(self._comp_release)
-
-        self._comp_output_gain = _SliderRow(
-            comp_group,
-            "Output Gain",
-            COMP_MIN_OUTPUT_GAIN,
-            COMP_MAX_OUTPUT_GAIN,
-            0.5,
-            self._config.compressor.output_gain_db,
-            "dB",
-            lambda v: (self._compressor.update_params(output_gain_db=v), self._schedule_save()),
-        )
-        comp_layout.addWidget(self._comp_output_gain)
-
-        comp_bottom = QWidget()
-        comp_bottom_layout = QHBoxLayout(comp_bottom)
-        comp_bottom_layout.setContentsMargins(0, 4, 0, 0)
-        comp_defaults_btn = QPushButton("Defaults")
-        comp_defaults_btn.clicked.connect(self._on_comp_reset)
-        comp_bottom_layout.addWidget(comp_defaults_btn)
-        comp_bottom_layout.addStretch()
-        comp_layout.addWidget(comp_bottom)
-
-        # --- Expander ---
-        exp_group = QGroupBox("Expander")
-        scroll_layout.addWidget(exp_group)
-        exp_layout = QVBoxLayout(exp_group)
-        exp_layout.setContentsMargins(6, 4, 6, 8)
-        exp_layout.setSpacing(2)
-
-        exp_top = QWidget()
-        exp_top_layout = QHBoxLayout(exp_top)
-        exp_top_layout.setContentsMargins(0, 0, 0, 0)
-        exp_top_layout.addStretch()
-        self._exp_enabled = QCheckBox("Enable")
+        # Expander アイテム (処理順: Expander → Compressor)
+        exp_item = QListWidgetItem()
+        exp_widget = QWidget()
+        exp_widget.setMaximumWidth(180)
+        exp_item_layout = QHBoxLayout(exp_widget)
+        exp_item_layout.setContentsMargins(6, 4, 6, 4)
+        self._exp_label = QLabel("Expander")
+        exp_item_layout.addWidget(self._exp_label, 1)
+        self._exp_enabled = ToggleSwitch()
         self._exp_enabled.setChecked(self._config.expander.enabled)
-        self._exp_enabled.stateChanged.connect(
-            lambda _state: self._on_exp_enabled_change()
-        )
-        exp_top_layout.addWidget(self._exp_enabled)
-        exp_layout.addWidget(exp_top)
+        self._exp_enabled.toggled.connect(lambda _checked: self._on_exp_enabled_change())
+        exp_item_layout.addWidget(self._exp_enabled, 0, Qt.AlignmentFlag.AlignVCenter)
+        self._filter_list.addItem(exp_item)
+        exp_item.setSizeHint(exp_widget.sizeHint())
+        self._filter_list.setItemWidget(exp_item, exp_widget)
+
+        # Compressor アイテム
+        comp_item = QListWidgetItem()
+        comp_widget = QWidget()
+        comp_widget.setMaximumWidth(180)
+        comp_item_layout = QHBoxLayout(comp_widget)
+        comp_item_layout.setContentsMargins(6, 4, 6, 4)
+        self._comp_label = QLabel("Compressor")
+        comp_item_layout.addWidget(self._comp_label, 1)
+        self._comp_enabled = ToggleSwitch()
+        self._comp_enabled.setChecked(self._config.compressor.enabled)
+        self._comp_enabled.toggled.connect(lambda _checked: self._on_comp_enabled_change())
+        comp_item_layout.addWidget(self._comp_enabled, 0, Qt.AlignmentFlag.AlignVCenter)
+        self._filter_list.addItem(comp_item)
+        comp_item.setSizeHint(comp_widget.sizeHint())
+        self._filter_list.setItemWidget(comp_item, comp_widget)
+
+        # 初期状態のグレーアウト反映
+        self._update_filter_label_style()
+
+        left_layout.addWidget(self._filter_list)
+
+        reset_all_btn = QPushButton("Reset All")
+        reset_all_btn.clicked.connect(self._on_reset)
+        left_layout.addWidget(reset_all_btn)
+
+        filter_split.addWidget(left_pane)
+
+        # === 右ペイン: 選択中フィルタの詳細設定 ===
+        self._filter_stack = QStackedWidget()
+
+        # -- Expander ページ (index 0) --
+        exp_page = QWidget()
+        exp_page_layout = QVBoxLayout(exp_page)
+        exp_page_layout.setContentsMargins(6, 4, 6, 8)
+        exp_page_layout.setSpacing(2)
 
         preset_row, self._exp_preset_combo = _build_labeled_combo_row(
             "Preset",
@@ -678,67 +759,67 @@ class SettingsWindow(QWidget):
             self._config.expander.preset,
             self._on_preset_change,
         )
-        exp_layout.addWidget(preset_row)
+        exp_page_layout.addWidget(preset_row)
 
         self._exp_ratio = _SliderRow(
-            exp_group,
+            exp_page,
             "Ratio",
             EXP_MIN_RATIO,
             EXP_MAX_RATIO,
             0.5,
             self._config.expander.ratio,
             ":1",
-            lambda v: (self._expander.update_params(ratio=v), self._schedule_save()),
+            lambda v: self._update_exp(ratio=v),
         )
-        exp_layout.addWidget(self._exp_ratio)
+        exp_page_layout.addWidget(self._exp_ratio)
 
         self._exp_threshold = _SliderRow(
-            exp_group,
+            exp_page,
             "Threshold",
             EXP_MIN_THRESHOLD_DB,
             0.0,
             0.5,
             self._config.expander.threshold_db,
             "dB",
-            lambda v: (self._expander.update_params(threshold=v), self._schedule_save()),
+            lambda v: self._update_exp(threshold=v),
         )
-        exp_layout.addWidget(self._exp_threshold)
+        exp_page_layout.addWidget(self._exp_threshold)
 
         self._exp_attack = _SliderRow(
-            exp_group,
+            exp_page,
             "Attack",
             EXP_MIN_ATK_RLS_MS,
             EXP_MAX_ATK_MS,
             1,
             self._config.expander.attack_ms,
             "ms",
-            lambda v: (self._expander.update_params(attack_ms=int(v)), self._schedule_save()),
+            lambda v: self._update_exp(attack_ms=int(v)),
         )
-        exp_layout.addWidget(self._exp_attack)
+        exp_page_layout.addWidget(self._exp_attack)
 
         self._exp_release = _SliderRow(
-            exp_group,
+            exp_page,
             "Release",
             5,
             EXP_MAX_RLS_MS,
             5,
             self._config.expander.release_ms,
             "ms",
-            lambda v: (self._expander.update_params(release_ms=int(v)), self._schedule_save()),
+            lambda v: self._update_exp(release_ms=int(v)),
         )
-        exp_layout.addWidget(self._exp_release)
+        exp_page_layout.addWidget(self._exp_release)
 
         self._exp_output_gain = _SliderRow(
-            exp_group,
+            exp_page,
             "Output Gain",
             EXP_MIN_OUTPUT_GAIN,
             EXP_MAX_OUTPUT_GAIN,
             0.5,
             self._config.expander.output_gain_db,
             "dB",
-            lambda v: (self._expander.update_params(output_gain_db=v), self._schedule_save()),
+            lambda v: self._update_exp(output_gain_db=v),
         )
-        exp_layout.addWidget(self._exp_output_gain)
+        exp_page_layout.addWidget(self._exp_output_gain)
 
         detector_row, self._exp_detector_combo = _build_labeled_combo_row(
             "Detector",
@@ -746,35 +827,118 @@ class SettingsWindow(QWidget):
             self._config.expander.detector,
             self._on_detector_change,
         )
-        exp_layout.addWidget(detector_row)
+        exp_page_layout.addWidget(detector_row)
 
         exp_bottom = QWidget()
         exp_bottom_layout = QHBoxLayout(exp_bottom)
-        exp_bottom_layout.setContentsMargins(0, 4, 0, 0)
+        exp_bottom_layout.setContentsMargins(0, 8, 0, 0)
         exp_defaults_btn = QPushButton("Defaults")
         exp_defaults_btn.clicked.connect(self._on_exp_reset)
         exp_bottom_layout.addWidget(exp_defaults_btn)
         exp_bottom_layout.addStretch()
-        exp_layout.addWidget(exp_bottom)
+        exp_page_layout.addWidget(exp_bottom)
+        exp_page_layout.addStretch()
 
-        # --- ボタン行 ---
-        btn_widget = QWidget()
-        btn_layout = QHBoxLayout(btn_widget)
-        btn_layout.setContentsMargins(0, 4, 0, 4)
-        scroll_layout.addWidget(btn_widget)
+        self._filter_stack.addWidget(exp_page)
 
-        reset_all_btn = QPushButton("Reset All")
-        reset_all_btn.clicked.connect(self._on_reset)
-        btn_layout.addWidget(reset_all_btn)
+        # -- Compressor ページ (index 1) --
+        comp_page = QWidget()
+        comp_page_layout = QVBoxLayout(comp_page)
+        comp_page_layout.setContentsMargins(6, 4, 6, 8)
+        comp_page_layout.setSpacing(2)
 
-        btn_layout.addStretch()
+        self._comp_ratio = _SliderRow(
+            comp_page,
+            "Ratio",
+            COMP_MIN_RATIO,
+            COMP_MAX_RATIO,
+            0.5,
+            self._config.compressor.ratio,
+            ":1",
+            lambda v: self._update_comp(ratio=v),
+        )
+        comp_page_layout.addWidget(self._comp_ratio)
+
+        self._comp_threshold = _SliderRow(
+            comp_page,
+            "Threshold",
+            COMP_MIN_THRESHOLD_DB,
+            0.0,
+            0.5,
+            self._config.compressor.threshold_db,
+            "dB",
+            lambda v: self._update_comp(threshold=v),
+        )
+        comp_page_layout.addWidget(self._comp_threshold)
+
+        self._comp_attack = _SliderRow(
+            comp_page,
+            "Attack",
+            COMP_MIN_ATK_RLS_MS,
+            COMP_MAX_ATK_MS,
+            1,
+            self._config.compressor.attack_ms,
+            "ms",
+            lambda v: self._update_comp(attack_ms=int(v)),
+        )
+        comp_page_layout.addWidget(self._comp_attack)
+
+        self._comp_release = _SliderRow(
+            comp_page,
+            "Release",
+            5,
+            COMP_MAX_RLS_MS,
+            5,
+            self._config.compressor.release_ms,
+            "ms",
+            lambda v: self._update_comp(release_ms=int(v)),
+        )
+        comp_page_layout.addWidget(self._comp_release)
+
+        self._comp_output_gain = _SliderRow(
+            comp_page,
+            "Output Gain",
+            COMP_MIN_OUTPUT_GAIN,
+            COMP_MAX_OUTPUT_GAIN,
+            0.5,
+            self._config.compressor.output_gain_db,
+            "dB",
+            lambda v: self._update_comp(output_gain_db=v),
+        )
+        comp_page_layout.addWidget(self._comp_output_gain)
+
+        comp_bottom = QWidget()
+        comp_bottom_layout = QHBoxLayout(comp_bottom)
+        comp_bottom_layout.setContentsMargins(0, 8, 0, 0)
+        comp_defaults_btn = QPushButton("Defaults")
+        comp_defaults_btn.clicked.connect(self._on_comp_reset)
+        comp_bottom_layout.addWidget(comp_defaults_btn)
+        comp_bottom_layout.addStretch()
+        comp_page_layout.addWidget(comp_bottom)
+        comp_page_layout.addStretch()
+
+        self._filter_stack.addWidget(comp_page)
+
+        # 左ペイン選択 → 右ペインページ切り替え
+        self._filter_list.currentRowChanged.connect(self._filter_stack.setCurrentIndex)
+
+        filter_split.addWidget(self._filter_stack, 1)
+
+        filter_group_layout.addLayout(filter_split)
 
         # --- エラー表示ラベル ---
         self._error_label = QLabel("")
         self._error_label.setStyleSheet("color: #ff6666;")
-        scroll_layout.addWidget(self._error_label)
+        filter_group_layout.addWidget(self._error_label)
 
-        scroll_layout.addStretch()
+        main_layout.addWidget(filter_group, 1)  # stretch=1 で残り領域を占有
+
+        # --- 初期選択（レイアウト構築完了後に行う） ---
+        # QStackedWidget のデフォルトページを明示的に設定し、
+        # QListWidget の選択と同期させる。シグナルだけに頼ると
+        # currentRow が既に 0 の場合に currentRowChanged が発火しない。
+        self._filter_stack.setCurrentIndex(0)
+        self._filter_list.setCurrentRow(0)
 
     @staticmethod
     def _refresh_combo(combo: QComboBox, items: list[str], current: str) -> None:
@@ -833,13 +997,24 @@ class SettingsWindow(QWidget):
         enabled = self._comp_enabled.isChecked()
         self._config.compressor.enabled = enabled
         self._compressor.enabled = enabled
+        self._update_filter_label_style()
         self._schedule_save()
 
     def _on_exp_enabled_change(self) -> None:
         enabled = self._exp_enabled.isChecked()
         self._config.expander.enabled = enabled
         self._expander.enabled = enabled
+        self._update_filter_label_style()
         self._schedule_save()
+
+    def _update_filter_label_style(self) -> None:
+        """トグル状態に応じてフィルタ名ラベルのスタイルを更新する。"""
+        self._exp_label.setStyleSheet(
+            "" if self._exp_enabled.isChecked() else _FILTER_DISABLED_STYLE
+        )
+        self._comp_label.setStyleSheet(
+            "" if self._comp_enabled.isChecked() else _FILTER_DISABLED_STYLE
+        )
 
     def _on_preset_change(self) -> None:
         preset = self._exp_preset_combo.currentText()
@@ -868,6 +1043,14 @@ class SettingsWindow(QWidget):
         mode = "dark" if btn_id == _APPEARANCE_ID_DARK else "light"
         apply_appearance_mode(mode)
         self._config.appearance_mode = mode
+        self._schedule_save()
+
+    def _update_exp(self, **kw: float) -> None:
+        self._expander.update_params(**kw)
+        self._schedule_save()
+
+    def _update_comp(self, **kw: float) -> None:
+        self._compressor.update_params(**kw)
         self._schedule_save()
 
     def _schedule_save(self) -> None:
