@@ -11,7 +11,16 @@ import queue
 from typing import Callable
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QCloseEvent, QColor, QFont, QPaintEvent, QPainter, QPalette, QPen
+from PySide6.QtGui import (
+    QCloseEvent,
+    QColor,
+    QFont,
+    QFontMetrics,
+    QPaintEvent,
+    QPainter,
+    QPalette,
+    QPen,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -98,6 +107,12 @@ METER_TICK_MARKS: list[float] = [-60.0, -50.0, -40.0, -30.0, -20.0, -10.0, 0.0]
 
 BLOCK_SIZE_OPTIONS: list[str] = ["128", "256", "480", "512", "960", "1024"]
 
+# グレーアウトテキスト用スタイルシート（範囲表示・補助ラベル等）
+_MUTED_STYLE: str = "color: #999999;"
+
+# apply_appearance_mode の二重適用を防ぐためのキャッシュ
+_applied_appearance_mode: str = ""
+
 
 def apply_appearance_mode(mode: str) -> None:
     """アプリケーション全体の外観モードを適用する（"dark" / "light"）。
@@ -105,11 +120,18 @@ def apply_appearance_mode(mode: str) -> None:
     Fusion スタイル + QPalette によるテーマ切り替え。
     DPI スケーリングは PySide6 が自動的に処理する。
     """
+    global _applied_appearance_mode
+    normalized = mode.lower()
+    if normalized == _applied_appearance_mode:
+        return
+
     app = QApplication.instance()
     if not isinstance(app, QApplication):
         return
 
-    if mode.lower() == "dark":
+    _applied_appearance_mode = normalized
+
+    if normalized == "dark":
         palette = QPalette()
         palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
         palette.setColor(QPalette.ColorRole.WindowText, QColor(255, 255, 255))
@@ -141,6 +163,17 @@ class _MeterBar(QWidget):
         self._level_db: float = METER_MIN_DB
         self._peak_db: float = METER_MIN_DB
 
+        # paintEvent 内で毎回生成しないようオブジェクトをキャッシュ
+        self._tick_font = QFont()
+        self._tick_font.setPointSize(7)
+        self._tick_pen = QPen(QColor("#999999"), 1)
+        self._tick_fm = QFontMetrics(self._tick_font)
+
+        # 幅が変わったときのみ再計算する閾値 x 座標キャッシュ
+        self._cached_w: int = -1
+        self._cached_x_green: int = 0
+        self._cached_x_yellow: int = 0
+
     def update_levels(self, level_db: float, peak_db: float) -> None:
         self._level_db = level_db
         self._peak_db = peak_db
@@ -156,8 +189,14 @@ class _MeterBar(QWidget):
         w = self.width()
         bar_h = METER_BAR_HEIGHT
 
-        x_green = self._db_to_x(METER_GREEN_MAX_DB, w)
-        x_yellow = self._db_to_x(METER_YELLOW_MAX_DB, w)
+        # 幅が変わった場合のみ閾値 x 座標を再計算
+        if w != self._cached_w:
+            self._cached_w = w
+            self._cached_x_green = self._db_to_x(METER_GREEN_MAX_DB, w)
+            self._cached_x_yellow = self._db_to_x(METER_YELLOW_MAX_DB, w)
+
+        x_green = self._cached_x_green
+        x_yellow = self._cached_x_yellow
         x_level = self._db_to_x(self._level_db, w)
         x_peak = self._db_to_x(self._peak_db, w)
 
@@ -195,11 +234,9 @@ class _MeterBar(QWidget):
         tick_top = bar_h + 2
         tick_bot = bar_h + 6
         label_y = bar_h + 8
-        font = QFont()
-        font.setPointSize(7)
-        painter.setFont(font)
-        painter.setPen(QPen(QColor("#999999"), 1))
-        fm = painter.fontMetrics()
+        painter.setFont(self._tick_font)
+        painter.setPen(self._tick_pen)
+        fm = self._tick_fm
 
         for db in METER_TICK_MARKS:
             x = self._db_to_x(db, w)
@@ -239,7 +276,7 @@ class LevelMeter(QWidget):
         header_layout.addStretch()
         self._label_db = QLabel("-60.0 dB")
         self._label_peak = QLabel("peak: -60.0 dB")
-        self._label_peak.setStyleSheet("color: #999999;")
+        self._label_peak.setStyleSheet(_MUTED_STYLE)
         header_layout.addWidget(self._label_db)
         header_layout.addWidget(self._label_peak)
 
@@ -328,7 +365,7 @@ class _SliderRow(QWidget):
 
         range_text = f"({from_:.0f}–{to:.0f} {unit})"
         range_lbl = QLabel(range_text)
-        range_lbl.setStyleSheet("color: #999999;")
+        range_lbl.setStyleSheet(_MUTED_STYLE)
         layout.addWidget(range_lbl)
         layout.addStretch()
 
@@ -356,6 +393,29 @@ class _SliderRow(QWidget):
         self._val_label.setText(self._format(value))
 
 
+def _build_labeled_combo_row(
+    label: str,
+    items: list[str],
+    current: str,
+    on_change: Callable[[], None],
+) -> tuple[QWidget, QComboBox]:
+    """ラベル + コンボボックス の 1 行ウィジェットを作成して返す。"""
+    row = QWidget()
+    layout = QHBoxLayout(row)
+    layout.setContentsMargins(0, 0, 0, 0)
+    lbl = QLabel(label)
+    lbl.setFixedWidth(110)
+    layout.addWidget(lbl)
+    combo = QComboBox()
+    combo.addItems(items)
+    combo.setCurrentText(current)
+    combo.setFixedWidth(140)
+    combo.currentTextChanged.connect(lambda _text: on_change())
+    layout.addWidget(combo)
+    layout.addStretch()
+    return row, combo
+
+
 class SettingsWindow(QWidget):
     """Filtflow 設定ウィンドウ。
 
@@ -377,8 +437,6 @@ class SettingsWindow(QWidget):
         self._compressor = compressor
         self._expander = expander
         self._stream = stream
-        self._level_queue = level_queue
-        self._level_meter: LevelMeter | None = None
 
         self._save_timer = QTimer(self)
         self._save_timer.setSingleShot(True)
@@ -416,8 +474,7 @@ class SettingsWindow(QWidget):
         scroll_layout.addWidget(meter_group)
         meter_layout = QVBoxLayout(meter_group)
         meter_layout.setContentsMargins(6, 6, 6, 6)
-        self._level_meter = LevelMeter(meter_group, level_queue)
-        meter_layout.addWidget(self._level_meter)
+        meter_layout.addWidget(LevelMeter(meter_group, level_queue))
 
         # --- Device ---
         dev_group = QGroupBox("Device")
@@ -456,7 +513,7 @@ class SettingsWindow(QWidget):
         )
         grid.addWidget(self._block_size_combo, 2, 1)
         samples_lbl = QLabel("samples")
-        samples_lbl.setStyleSheet("color: #999999;")
+        samples_lbl.setStyleSheet(_MUTED_STYLE)
         grid.addWidget(samples_lbl, 2, 2)
 
         # --- Compressor ---
@@ -557,21 +614,12 @@ class SettingsWindow(QWidget):
         exp_top_layout.addWidget(self._exp_enabled)
         exp_layout.addWidget(exp_top)
 
-        preset_row = QWidget()
-        preset_layout = QHBoxLayout(preset_row)
-        preset_layout.setContentsMargins(0, 0, 0, 0)
-        preset_lbl = QLabel("Preset")
-        preset_lbl.setFixedWidth(110)
-        preset_layout.addWidget(preset_lbl)
-        self._exp_preset_combo = QComboBox()
-        self._exp_preset_combo.addItems([PRESET_EXPANDER, PRESET_GATE])
-        self._exp_preset_combo.setCurrentText(self._config.expander.preset)
-        self._exp_preset_combo.setFixedWidth(140)
-        self._exp_preset_combo.currentTextChanged.connect(
-            lambda _text: self._on_preset_change()
+        preset_row, self._exp_preset_combo = _build_labeled_combo_row(
+            "Preset",
+            [PRESET_EXPANDER, PRESET_GATE],
+            self._config.expander.preset,
+            self._on_preset_change,
         )
-        preset_layout.addWidget(self._exp_preset_combo)
-        preset_layout.addStretch()
         exp_layout.addWidget(preset_row)
 
         self._exp_ratio = _SliderRow(
@@ -634,21 +682,12 @@ class SettingsWindow(QWidget):
         )
         exp_layout.addWidget(self._exp_output_gain)
 
-        detector_row = QWidget()
-        detector_layout = QHBoxLayout(detector_row)
-        detector_layout.setContentsMargins(0, 0, 0, 0)
-        detector_lbl = QLabel("Detector")
-        detector_lbl.setFixedWidth(110)
-        detector_layout.addWidget(detector_lbl)
-        self._exp_detector_combo = QComboBox()
-        self._exp_detector_combo.addItems([DETECTOR_RMS, DETECTOR_PEAK])
-        self._exp_detector_combo.setCurrentText(self._config.expander.detector)
-        self._exp_detector_combo.setFixedWidth(140)
-        self._exp_detector_combo.currentTextChanged.connect(
-            lambda _text: self._on_detector_change()
+        detector_row, self._exp_detector_combo = _build_labeled_combo_row(
+            "Detector",
+            [DETECTOR_RMS, DETECTOR_PEAK],
+            self._config.expander.detector,
+            self._on_detector_change,
         )
-        detector_layout.addWidget(self._exp_detector_combo)
-        detector_layout.addStretch()
         exp_layout.addWidget(detector_row)
 
         # --- ボタン行 ---
@@ -678,28 +717,24 @@ class SettingsWindow(QWidget):
 
         scroll_layout.addStretch()
 
+    @staticmethod
+    def _refresh_combo(combo: QComboBox, items: list[str], current: str) -> None:
+        """コンボボックスの内容を一括更新し、シグナルを一時停止する。"""
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItems(items)
+        if current:
+            idx = combo.findText(current)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+        combo.blockSignals(False)
+
     def _refresh_device_lists(self) -> None:
         """デバイス一覧を再取得してコンボボックスを更新する。"""
         in_names = [str(d["name"]) for d in list_input_devices()]
         out_names = [str(d["name"]) for d in list_output_devices()]
-
-        self._input_combo.blockSignals(True)
-        self._input_combo.clear()
-        self._input_combo.addItems(in_names)
-        if self._config.input_device_name:
-            idx = self._input_combo.findText(self._config.input_device_name)
-            if idx >= 0:
-                self._input_combo.setCurrentIndex(idx)
-        self._input_combo.blockSignals(False)
-
-        self._output_combo.blockSignals(True)
-        self._output_combo.clear()
-        self._output_combo.addItems(out_names)
-        if self._config.output_device_name:
-            idx = self._output_combo.findText(self._config.output_device_name)
-            if idx >= 0:
-                self._output_combo.setCurrentIndex(idx)
-        self._output_combo.blockSignals(False)
+        self._refresh_combo(self._input_combo, in_names, self._config.input_device_name)
+        self._refresh_combo(self._output_combo, out_names, self._config.output_device_name)
 
     def show_error(self, msg: str) -> None:
         self._error_label.setText(msg)
