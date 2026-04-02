@@ -114,8 +114,8 @@ METER_MAX_DB: float = 0.0
 METER_UPDATE_MS: int = 30
 PEAK_HOLD_SEC: float = 2.0
 
-METER_BAR_HEIGHT: int = 12
-METER_SCALE_HEIGHT: int = 22
+METER_BAR_HEIGHT: int = 10
+METER_SCALE_HEIGHT: int = 18
 METER_TICK_MARKS: list[float] = [-60.0, -50.0, -40.0, -30.0, -20.0, -10.0, 0.0]
 
 BLOCK_SIZE_OPTIONS: list[str] = ["128", "256", "480", "512", "960", "1024"]
@@ -500,20 +500,20 @@ class _SliderRow(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         lbl = QLabel(label)
-        lbl.setFixedWidth(110)
+        lbl.setFixedWidth(90)
         layout.addWidget(lbl)
 
         self._slider = QSlider(Qt.Orientation.Horizontal)
         self._slider.setRange(0, steps)
-        self._slider.setFixedWidth(200)
+        self._slider.setMinimumWidth(80)
         self._slider.setValue(self._to_int(initial))
         self._slider.valueChanged.connect(self._on_slider_changed)
-        layout.addWidget(self._slider)
+        layout.addWidget(self._slider, 1)  # stretch=1 で残り幅を埋める
 
         self._val_label = QLabel(self._format(initial))
-        self._val_label.setFixedWidth(90)
+        self._val_label.setFixedWidth(75)
+        self._val_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(self._val_label)
-        layout.addStretch()
 
     def _to_int(self, value: float) -> int:
         return int(round((value - self._from) / self._resolution))
@@ -550,15 +550,13 @@ def _build_labeled_combo_row(
     layout = QHBoxLayout(row)
     layout.setContentsMargins(0, 0, 0, 0)
     lbl = QLabel(label)
-    lbl.setFixedWidth(110)
+    lbl.setFixedWidth(90)
     layout.addWidget(lbl)
     combo = QComboBox()
     combo.addItems(items)
     combo.setCurrentText(current)
-    combo.setFixedWidth(140)
     combo.currentTextChanged.connect(lambda _text: on_change())
-    layout.addWidget(combo)
-    layout.addStretch()
+    layout.addWidget(combo, 1)  # 残り幅を埋める
     return row, combo
 
 
@@ -589,8 +587,8 @@ class SettingsWindow(QWidget):
         self._save_timer.timeout.connect(self._do_save)
 
         self.setWindowTitle("Filtflow Settings")
-        self.setMinimumSize(650, 500)
-        self.resize(700, 700)
+        self.setMinimumSize(580, 480)
+        self.resize(620, 650)
 
         self._build_ui(level_queue)
         self._refresh_device_lists()
@@ -651,11 +649,11 @@ class SettingsWindow(QWidget):
         dev_grid = QWidget()
         grid = QGridLayout(dev_grid)
         grid.setContentsMargins(0, 0, 0, 0)
+        grid.setColumnStretch(1, 1)  # コンボボックス列が残り幅を埋める
         dev_layout.addWidget(dev_grid)
 
         grid.addWidget(QLabel("Input Device:"), 0, 0)
         self._input_combo = QComboBox()
-        self._input_combo.setMinimumWidth(330)
         self._input_combo.currentIndexChanged.connect(
             lambda _idx: self._on_device_change()
         )
@@ -663,7 +661,6 @@ class SettingsWindow(QWidget):
 
         grid.addWidget(QLabel("Output Device:"), 1, 0)
         self._output_combo = QComboBox()
-        self._output_combo.setMinimumWidth(330)
         self._output_combo.currentIndexChanged.connect(
             lambda _idx: self._on_device_change()
         )
