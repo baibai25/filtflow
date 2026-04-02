@@ -5,22 +5,48 @@ sounddevice は PortAudio に依存するため、CI 環境ではモックを使
 
 from __future__ import annotations
 
+import importlib
 import queue
 import sys
 import types
+from typing import TYPE_CHECKING
 from unittest import mock
 
 import numpy as np
+import pytest
 
-# sounddevice が PortAudio なしでインポートに失敗する環境向けにモックを差し込む
-_sd_mock = types.ModuleType("sounddevice")
-_sd_mock.Stream = mock.MagicMock  # type: ignore[attr-defined]
-_sd_mock.CallbackFlags = type(None)  # type: ignore[attr-defined]
-_sd_mock.query_devices = mock.MagicMock(return_value=[])  # type: ignore[attr-defined]
-_sd_mock.query_hostapis = mock.MagicMock(return_value=[])  # type: ignore[attr-defined]
-sys.modules.setdefault("sounddevice", _sd_mock)
+if TYPE_CHECKING:
+    from Filtflow.audio_stream import AudioStream
 
-from Filtflow.audio_stream import AudioStream  # noqa: E402
+
+@pytest.fixture(autouse=True)
+def _mock_sounddevice(monkeypatch: pytest.MonkeyPatch) -> None:
+    """各テストごとに sounddevice をモックし、AudioStream を読み込む。"""
+    sd_mock = types.ModuleType("sounddevice")
+    sd_mock.Stream = mock.MagicMock  # type: ignore[attr-defined]
+    sd_mock.CallbackFlags = type(None)  # type: ignore[attr-defined]
+    sd_mock.query_devices = mock.MagicMock(return_value=[])  # type: ignore[attr-defined]
+    sd_mock.query_hostapis = mock.MagicMock(return_value=[])  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "sounddevice", sd_mock)
+
+    # Filtflow.audio_stream を再読み込みしてモック済み sd を使わせる
+    sys.modules.pop("Filtflow.audio_stream", None)
+    mod = importlib.import_module("Filtflow.audio_stream")
+    globals()["AudioStream"] = mod.AudioStream
+
+
+def _make_stream(**kwargs: object) -> "AudioStream":
+    """AudioStream のヘルパーコンストラクタ。"""
+    defaults: dict[str, object] = {
+        "input_device": 0,
+        "output_device": 1,
+        "filter_chain": [],
+        "sample_rate": 48000,
+        "block_size": 480,
+    }
+    defaults.update(kwargs)
+    cls = globals()["AudioStream"]
+    return cls(**defaults)  # type: ignore[no-any-return]
 
 
 class TestAudioStreamCallback:
@@ -30,13 +56,7 @@ class TestAudioStreamCallback:
         def double_filter(frame: np.ndarray) -> np.ndarray:
             return frame * 2.0
 
-        stream = AudioStream(
-            input_device=0,
-            output_device=1,
-            filter_chain=[double_filter],
-            sample_rate=48000,
-            block_size=480,
-        )
+        stream = _make_stream(filter_chain=[double_filter])
 
         indata = np.ones((480, 1), dtype=np.float32) * 0.5
         outdata = np.zeros((480, 1), dtype=np.float32)
@@ -56,13 +76,7 @@ class TestAudioStreamCallback:
             log.append("b")
             return frame * 2.0
 
-        stream = AudioStream(
-            input_device=0,
-            output_device=1,
-            filter_chain=[filter_a, filter_b],
-            sample_rate=48000,
-            block_size=480,
-        )
+        stream = _make_stream(filter_chain=[filter_a, filter_b])
 
         indata = np.ones((480, 1), dtype=np.float32) * 0.5
         outdata = np.zeros((480, 1), dtype=np.float32)
@@ -75,14 +89,7 @@ class TestAudioStreamCallback:
     def test_callback_pushes_level(self) -> None:
         """コールバック後にレベルキューに値が積まれることを確認。"""
         level_q: queue.Queue[float] = queue.Queue(maxsize=100)
-        stream = AudioStream(
-            input_device=0,
-            output_device=1,
-            filter_chain=[],
-            sample_rate=48000,
-            block_size=480,
-            level_queue=level_q,
-        )
+        stream = _make_stream(filter_chain=[], level_queue=level_q)
 
         indata = np.ones((480, 1), dtype=np.float32) * 0.5
         outdata = np.zeros((480, 1), dtype=np.float32)
@@ -95,13 +102,7 @@ class TestAudioStreamCallback:
 
     def test_start_without_input_device_raises(self) -> None:
         """入力デバイス未設定で start() すると RuntimeError。"""
-        stream = AudioStream(
-            input_device=None,
-            output_device=1,
-            filter_chain=[],
-            sample_rate=48000,
-            block_size=480,
-        )
+        stream = _make_stream(input_device=None)
         try:
             stream.start()
             raise AssertionError("Expected RuntimeError")
@@ -110,13 +111,7 @@ class TestAudioStreamCallback:
 
     def test_start_without_output_device_raises(self) -> None:
         """出力デバイス未設定で start() すると RuntimeError。"""
-        stream = AudioStream(
-            input_device=0,
-            output_device=None,
-            filter_chain=[],
-            sample_rate=48000,
-            block_size=480,
-        )
+        stream = _make_stream(output_device=None)
         try:
             stream.start()
             raise AssertionError("Expected RuntimeError")

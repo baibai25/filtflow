@@ -58,8 +58,10 @@ class TestCompressor:
         # 0 dBFS の信号 (振幅 1.0)
         frame = np.ones((480, 1), dtype=np.float32) * 0.9
         out = comp.process(frame)
-        # 閾値を超えているので圧縮される（出力 < 入力）
-        assert float(np.max(np.abs(out))) < 0.9
+        # attack_ms の立ち上がり直後は未圧縮のサンプルが残りうるため、
+        # エンベロープが十分追従した末尾区間で圧縮を確認する
+        steady_state = out[-120:]
+        assert float(np.max(np.abs(steady_state))) < 0.9
 
     def test_quiet_signal_not_compressed(self) -> None:
         comp = self._make_compressor(threshold=-18.0, ratio=10.0)
