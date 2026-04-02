@@ -252,8 +252,11 @@ class ToggleSwitch(QAbstractButton):
         pal = self.palette()
         knob_d = _TOGGLE_HEIGHT - 2 * _TOGGLE_KNOB_MARGIN
 
-        # Track
-        track_color = pal.highlight().color() if self.isChecked() else pal.mid().color()
+        # Track — ON: accent color, OFF: muted gray (theme-independent)
+        if self.isChecked():
+            track_color = pal.highlight().color()
+        else:
+            track_color = QColor("#888888")
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(track_color))
         p.drawRoundedRect(
@@ -261,8 +264,8 @@ class ToggleSwitch(QAbstractButton):
             _TOGGLE_HEIGHT / 2, _TOGGLE_HEIGHT / 2,
         )
 
-        # Knob
-        p.setBrush(QBrush(pal.brightText().color()))
+        # Knob — always white for contrast on both themes
+        p.setBrush(QBrush(QColor("#ffffff")))
         p.drawEllipse(
             int(self._knob_x), _TOGGLE_KNOB_MARGIN, knob_d, knob_d,
         )
