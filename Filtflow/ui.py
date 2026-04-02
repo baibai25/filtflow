@@ -384,11 +384,6 @@ class _SliderRow(QWidget):
         self._val_label = QLabel(self._format(initial))
         self._val_label.setFixedWidth(90)
         layout.addWidget(self._val_label)
-
-        range_text = f"({from_:.0f}–{to:.0f} {unit})"
-        range_lbl = QLabel(range_text)
-        range_lbl.setStyleSheet(_MUTED_STYLE)
-        layout.addWidget(range_lbl)
         layout.addStretch()
 
     def _to_int(self, value: float) -> int:
