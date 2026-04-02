@@ -8,7 +8,7 @@
 5. QApplication のイベントループをメインスレッドで実行
 
 終了フロー:
-- トレイ「終了」 → _AppBridge.quit_requested シグナル（QueuedConnection）
+- トレイ「Quit」 → _AppBridge.quit_requested シグナル（QueuedConnection）
   → _do_quit() → stream.stop() → app.quit()
 """
 
