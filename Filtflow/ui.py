@@ -111,6 +111,25 @@ METER_TICK_MARKS: list[float] = [-60.0, -50.0, -40.0, -30.0, -20.0, -10.0, 0.0]
 
 BLOCK_SIZE_OPTIONS: list[str] = ["128", "256", "480", "512", "960", "1024"]
 
+# フィルタ有効/無効トグルスイッチのスタイル
+_TOGGLE_SWITCH_STYLE: str = """
+    QCheckBox {
+        spacing: 0px;
+    }
+    QCheckBox::indicator {
+        width: 36px;
+        height: 18px;
+        border-radius: 9px;
+        background-color: palette(mid);
+    }
+    QCheckBox::indicator:checked {
+        background-color: palette(highlight);
+    }
+"""
+
+# フィルタ名ラベルの無効時スタイル
+_FILTER_DISABLED_STYLE: str = "color: palette(mid); text-decoration: line-through;"
+
 # グレーアウトテキスト用スタイルシート（範囲表示・補助ラベル等）
 # palette(mid) はテーマに追従するため、ダーク・ライト問わず適切なコントラストになる
 _MUTED_STYLE: str = "color: palette(mid);"
@@ -578,8 +597,12 @@ class SettingsWindow(QWidget):
         exp_item = QListWidgetItem()
         exp_widget = QWidget()
         exp_item_layout = QHBoxLayout(exp_widget)
-        exp_item_layout.setContentsMargins(4, 2, 4, 2)
-        self._exp_enabled = QCheckBox("Expander")
+        exp_item_layout.setContentsMargins(6, 4, 6, 4)
+        self._exp_label = QLabel("Expander")
+        exp_item_layout.addWidget(self._exp_label)
+        exp_item_layout.addStretch()
+        self._exp_enabled = QCheckBox()
+        self._exp_enabled.setStyleSheet(_TOGGLE_SWITCH_STYLE)
         self._exp_enabled.setChecked(self._config.expander.enabled)
         self._exp_enabled.stateChanged.connect(
             lambda _state: self._on_exp_enabled_change()
@@ -593,8 +616,12 @@ class SettingsWindow(QWidget):
         comp_item = QListWidgetItem()
         comp_widget = QWidget()
         comp_item_layout = QHBoxLayout(comp_widget)
-        comp_item_layout.setContentsMargins(4, 2, 4, 2)
-        self._comp_enabled = QCheckBox("Compressor")
+        comp_item_layout.setContentsMargins(6, 4, 6, 4)
+        self._comp_label = QLabel("Compressor")
+        comp_item_layout.addWidget(self._comp_label)
+        comp_item_layout.addStretch()
+        self._comp_enabled = QCheckBox()
+        self._comp_enabled.setStyleSheet(_TOGGLE_SWITCH_STYLE)
         self._comp_enabled.setChecked(self._config.compressor.enabled)
         self._comp_enabled.stateChanged.connect(
             lambda _state: self._on_comp_enabled_change()
@@ -603,6 +630,9 @@ class SettingsWindow(QWidget):
         self._filter_list.addItem(comp_item)
         comp_item.setSizeHint(comp_widget.sizeHint())
         self._filter_list.setItemWidget(comp_item, comp_widget)
+
+        # 初期状態のグレーアウト反映
+        self._update_filter_label_style()
 
         left_layout.addWidget(self._filter_list)
 
@@ -859,13 +889,24 @@ class SettingsWindow(QWidget):
         enabled = self._comp_enabled.isChecked()
         self._config.compressor.enabled = enabled
         self._compressor.enabled = enabled
+        self._update_filter_label_style()
         self._schedule_save()
 
     def _on_exp_enabled_change(self) -> None:
         enabled = self._exp_enabled.isChecked()
         self._config.expander.enabled = enabled
         self._expander.enabled = enabled
+        self._update_filter_label_style()
         self._schedule_save()
+
+    def _update_filter_label_style(self) -> None:
+        """トグル状態に応じてフィルタ名ラベルのスタイルを更新する。"""
+        self._exp_label.setStyleSheet(
+            "" if self._exp_enabled.isChecked() else _FILTER_DISABLED_STYLE
+        )
+        self._comp_label.setStyleSheet(
+            "" if self._comp_enabled.isChecked() else _FILTER_DISABLED_STYLE
+        )
 
     def _on_preset_change(self) -> None:
         preset = self._exp_preset_combo.currentText()
