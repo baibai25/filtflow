@@ -145,20 +145,6 @@ _TOGGLE_BTN_STYLE: str = """
 _APPEARANCE_ID_DARK: int = 0
 _APPEARANCE_ID_LIGHT: int = 1
 
-# アクションボタン（Defaults / Reset All）のスタイル
-# palette(highlight) でテーマのアクセント色に追従する
-_ACTION_BTN_STYLE: str = """
-    QPushButton {
-        background-color: palette(highlight);
-        color: palette(highlighted-text);
-        border: none;
-        border-radius: 3px;
-        padding: 2px 8px;
-        font-size: 11px;
-    }
-    QPushButton:hover   { border: 1px solid palette(highlighted-text); }
-    QPushButton:pressed { background-color: palette(mid); color: palette(window-text); }
-"""
 
 # apply_appearance_mode の二重適用を防ぐためのキャッシュ
 _applied_appearance_mode: str = ""
@@ -490,6 +476,37 @@ class SettingsWindow(QWidget):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(4, 4, 4, 4)
 
+        # --- 右上の外観切り替えトグル ---
+        header = QWidget()
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.addStretch()
+
+        self._dark_btn = QPushButton("Dark")
+        self._dark_btn.setCheckable(True)
+        self._dark_btn.setObjectName("darkToggle")
+        self._dark_btn.setStyleSheet(_TOGGLE_BTN_STYLE)
+
+        self._light_btn = QPushButton("Light")
+        self._light_btn.setCheckable(True)
+        self._light_btn.setObjectName("lightToggle")
+        self._light_btn.setStyleSheet(_TOGGLE_BTN_STYLE)
+
+        self._appearance_group = QButtonGroup(self)
+        self._appearance_group.setExclusive(True)
+        self._appearance_group.addButton(self._dark_btn, _APPEARANCE_ID_DARK)
+        self._appearance_group.addButton(self._light_btn, _APPEARANCE_ID_LIGHT)
+        self._appearance_group.idClicked.connect(self._on_appearance_change)
+
+        if self._config.appearance_mode.lower() == "dark":
+            self._dark_btn.setChecked(True)
+        else:
+            self._light_btn.setChecked(True)
+
+        header_layout.addWidget(self._dark_btn)
+        header_layout.addWidget(self._light_btn)
+        main_layout.addWidget(header)
+
         scroll_area = QScrollArea(self)
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
@@ -631,8 +648,6 @@ class SettingsWindow(QWidget):
         comp_bottom_layout = QHBoxLayout(comp_bottom)
         comp_bottom_layout.setContentsMargins(0, 4, 0, 0)
         comp_defaults_btn = QPushButton("Defaults")
-        comp_defaults_btn.setFixedWidth(100)
-        comp_defaults_btn.setStyleSheet(_ACTION_BTN_STYLE)
         comp_defaults_btn.clicked.connect(self._on_comp_reset)
         comp_bottom_layout.addWidget(comp_defaults_btn)
         comp_bottom_layout.addStretch()
@@ -737,8 +752,6 @@ class SettingsWindow(QWidget):
         exp_bottom_layout = QHBoxLayout(exp_bottom)
         exp_bottom_layout.setContentsMargins(0, 4, 0, 0)
         exp_defaults_btn = QPushButton("Defaults")
-        exp_defaults_btn.setFixedWidth(100)
-        exp_defaults_btn.setStyleSheet(_ACTION_BTN_STYLE)
         exp_defaults_btn.clicked.connect(self._on_exp_reset)
         exp_bottom_layout.addWidget(exp_defaults_btn)
         exp_bottom_layout.addStretch()
@@ -751,37 +764,10 @@ class SettingsWindow(QWidget):
         scroll_layout.addWidget(btn_widget)
 
         reset_all_btn = QPushButton("Reset All")
-        reset_all_btn.setFixedWidth(140)
-        reset_all_btn.setStyleSheet(_ACTION_BTN_STYLE)
         reset_all_btn.clicked.connect(self._on_reset)
         btn_layout.addWidget(reset_all_btn)
 
         btn_layout.addStretch()
-
-        # 外観切り替えトグル（セグメントコントロール風・テーマ色に統一）
-        self._dark_btn = QPushButton("Dark")
-        self._dark_btn.setCheckable(True)
-        self._dark_btn.setObjectName("darkToggle")
-        self._dark_btn.setStyleSheet(_TOGGLE_BTN_STYLE)
-
-        self._light_btn = QPushButton("Light")
-        self._light_btn.setCheckable(True)
-        self._light_btn.setObjectName("lightToggle")
-        self._light_btn.setStyleSheet(_TOGGLE_BTN_STYLE)
-
-        self._appearance_group = QButtonGroup(self)
-        self._appearance_group.setExclusive(True)
-        self._appearance_group.addButton(self._dark_btn, _APPEARANCE_ID_DARK)
-        self._appearance_group.addButton(self._light_btn, _APPEARANCE_ID_LIGHT)
-        self._appearance_group.idClicked.connect(self._on_appearance_change)
-
-        if self._config.appearance_mode.lower() == "dark":
-            self._dark_btn.setChecked(True)
-        else:
-            self._light_btn.setChecked(True)
-
-        btn_layout.addWidget(self._dark_btn)
-        btn_layout.addWidget(self._light_btn)
 
         # --- エラー表示ラベル ---
         self._error_label = QLabel("")
