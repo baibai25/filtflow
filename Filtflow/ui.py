@@ -708,11 +708,11 @@ class SettingsWindow(QWidget):
         # Expander アイテム (処理順: Expander → Compressor)
         exp_item = QListWidgetItem()
         exp_widget = QWidget()
+        exp_widget.setMaximumWidth(180)
         exp_item_layout = QHBoxLayout(exp_widget)
         exp_item_layout.setContentsMargins(6, 4, 6, 4)
         self._exp_label = QLabel("Expander")
-        exp_item_layout.addWidget(self._exp_label)
-        exp_item_layout.addStretch()
+        exp_item_layout.addWidget(self._exp_label, 1)
         self._exp_enabled = ToggleSwitch()
         self._exp_enabled.setChecked(self._config.expander.enabled)
         self._exp_enabled.toggled.connect(
@@ -726,11 +726,11 @@ class SettingsWindow(QWidget):
         # Compressor アイテム
         comp_item = QListWidgetItem()
         comp_widget = QWidget()
+        comp_widget.setMaximumWidth(180)
         comp_item_layout = QHBoxLayout(comp_widget)
         comp_item_layout.setContentsMargins(6, 4, 6, 4)
         self._comp_label = QLabel("Compressor")
-        comp_item_layout.addWidget(self._comp_label)
-        comp_item_layout.addStretch()
+        comp_item_layout.addWidget(self._comp_label, 1)
         self._comp_enabled = ToggleSwitch()
         self._comp_enabled.setChecked(self._config.compressor.enabled)
         self._comp_enabled.toggled.connect(
