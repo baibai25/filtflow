@@ -23,11 +23,11 @@ from PySide6.QtGui import (
     QPen,
 )
 from PySide6.QtWidgets import (
+    QAbstractScrollArea,
     QApplication,
     QButtonGroup,
     QCheckBox,
     QComboBox,
-    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -35,9 +35,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
-    QScrollArea,
     QSlider,
-    QSplitter,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -559,17 +557,22 @@ class SettingsWindow(QWidget):
         filter_group_layout = QVBoxLayout(filter_group)
         filter_group_layout.setContentsMargins(6, 6, 6, 6)
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        filter_split = QHBoxLayout()
 
         # === 左ペイン: フィルタ一覧 ===
         left_pane = QWidget()
+        left_pane.setFixedWidth(180)
         left_layout = QVBoxLayout(left_pane)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(4)
 
         self._filter_list = QListWidget()
-        self._filter_list.setMinimumWidth(160)
-        self._filter_list.setMaximumWidth(220)
+        self._filter_list.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self._filter_list.setSizeAdjustPolicy(
+            QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents
+        )
 
         # Expander アイテム (処理順: Expander → Compressor)
         exp_item = QListWidgetItem()
@@ -607,16 +610,13 @@ class SettingsWindow(QWidget):
         reset_all_btn.clicked.connect(self._on_reset)
         left_layout.addWidget(reset_all_btn)
 
-        splitter.addWidget(left_pane)
+        filter_split.addWidget(left_pane)
 
         # === 右ペイン: 選択中フィルタの詳細設定 ===
         self._filter_stack = QStackedWidget()
 
         # -- Expander ページ (index 0) --
         exp_page = QWidget()
-        exp_scroll = QScrollArea()
-        exp_scroll.setWidgetResizable(True)
-        exp_scroll.setFrameShape(QFrame.Shape.NoFrame)
         exp_page_layout = QVBoxLayout(exp_page)
         exp_page_layout.setContentsMargins(6, 4, 6, 8)
         exp_page_layout.setSpacing(2)
@@ -707,14 +707,10 @@ class SettingsWindow(QWidget):
         exp_page_layout.addWidget(exp_bottom)
         exp_page_layout.addStretch()
 
-        exp_scroll.setWidget(exp_page)
-        self._filter_stack.addWidget(exp_scroll)
+        self._filter_stack.addWidget(exp_page)
 
         # -- Compressor ページ (index 1) --
         comp_page = QWidget()
-        comp_scroll = QScrollArea()
-        comp_scroll.setWidgetResizable(True)
-        comp_scroll.setFrameShape(QFrame.Shape.NoFrame)
         comp_page_layout = QVBoxLayout(comp_page)
         comp_page_layout.setContentsMargins(6, 4, 6, 8)
         comp_page_layout.setSpacing(2)
@@ -789,18 +785,15 @@ class SettingsWindow(QWidget):
         comp_page_layout.addWidget(comp_bottom)
         comp_page_layout.addStretch()
 
-        comp_scroll.setWidget(comp_page)
-        self._filter_stack.addWidget(comp_scroll)
+        self._filter_stack.addWidget(comp_page)
 
         # 左ペイン選択 → 右ペインページ切り替え
         self._filter_list.currentRowChanged.connect(self._filter_stack.setCurrentIndex)
         self._filter_list.setCurrentRow(0)
 
-        splitter.addWidget(self._filter_stack)
-        splitter.setStretchFactor(0, 0)  # 左ペインは固定幅寄り
-        splitter.setStretchFactor(1, 1)  # 右ペインが伸縮
+        filter_split.addWidget(self._filter_stack, 1)
 
-        filter_group_layout.addWidget(splitter)
+        filter_group_layout.addLayout(filter_split)
 
         # --- エラー表示ラベル ---
         self._error_label = QLabel("")
