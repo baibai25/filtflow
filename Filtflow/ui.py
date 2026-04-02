@@ -13,11 +13,11 @@ from typing import Callable
 import qdarktheme
 
 from PySide6.QtCore import (
-    QEvent,
     Property,
     QEasingCurve,
     QPropertyAnimation,
     QSize,
+    Signal,
     Qt,
     QTimer,
 )
@@ -26,13 +26,13 @@ from PySide6.QtGui import (
     QCloseEvent,
     QColor,
     QFont,
+    QMouseEvent,
     QFontMetrics,
     QPaintEvent,
     QPainter,
     QPen,
 )
 from PySide6.QtWidgets import (
-    QAbstractButton,
     QAbstractScrollArea,
     QApplication,
     QButtonGroup,
@@ -193,29 +193,45 @@ _TOGGLE_HEIGHT: int = 22
 _TOGGLE_KNOB_MARGIN: int = 3
 
 
-class ToggleSwitch(QAbstractButton):
+class ToggleSwitch(QWidget):
     """iOS/Android 風の pill-shaped トグルスイッチ。
 
-    QAbstractButton を継承するため isChecked() / setChecked() / toggled シグナル
-    などが QCheckBox と同様に使える。ノブは QPropertyAnimation でスライドする。
-    palette(mid) / palette(highlight) を使用し、ダーク・ライト両テーマに対応。
+    QWidget を継承し QPainter で描画する。QAbstractButton を使わないことで
+    qdarktheme のグローバルスタイルシートによるボタン背景の上書きを回避する。
+    isChecked() / setChecked() / toggled シグナルを自前で提供する。
     """
+
+    toggled = Signal(bool)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setCheckable(True)
+        self._checked: bool = False
         self.setFixedSize(_TOGGLE_WIDTH, _TOGGLE_HEIGHT)
-        # qdarktheme のグローバルスタイルシートが QAbstractButton に背景を描画し
-        # カスタム paintEvent を覆い隠すのを防ぐ
-        self.setStyleSheet(
-            "background: transparent; border: none; padding: 0; margin: 0;"
-        )
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         # ノブの X 位置（アニメーション用プロパティ）
         self._knob_x: float = float(_TOGGLE_KNOB_MARGIN)
         self._animation = QPropertyAnimation(self, b"knob_x", self)
         self._animation.setDuration(120)
         self._animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
-        self.toggled.connect(self._start_animation)
+
+    # -- public API (QCheckBox 互換) ----------------------------------------
+
+    def isChecked(self) -> bool:  # noqa: N802
+        return self._checked
+
+    def setChecked(self, checked: bool) -> None:  # noqa: N802
+        """チェック状態を設定する（アニメーションなし・シグナル発火あり）。"""
+        if self._checked == checked:
+            return
+        self._checked = checked
+        knob_d = _TOGGLE_HEIGHT - 2 * _TOGGLE_KNOB_MARGIN
+        self._knob_x = (
+            float(_TOGGLE_WIDTH - _TOGGLE_KNOB_MARGIN - knob_d)
+            if checked
+            else float(_TOGGLE_KNOB_MARGIN)
+        )
+        self.update()
+        self.toggled.emit(checked)
 
     # -- Qt property for animation ------------------------------------------
 
@@ -236,19 +252,28 @@ class ToggleSwitch(QAbstractButton):
     def minimumSizeHint(self) -> QSize:  # noqa: N802
         return self.sizeHint()
 
-    # -- animation ----------------------------------------------------------
+    # -- click handling -----------------------------------------------------
 
-    def _start_animation(self, checked: bool) -> None:
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._toggle_with_animation()
+        super().mousePressEvent(event)
+
+    def _toggle_with_animation(self) -> None:
+        new_checked = not self._checked
+        self._checked = new_checked
+        # アニメーション開始
         self._animation.stop()
         knob_d = _TOGGLE_HEIGHT - 2 * _TOGGLE_KNOB_MARGIN
         end = (
             float(_TOGGLE_WIDTH - _TOGGLE_KNOB_MARGIN - knob_d)
-            if checked
+            if new_checked
             else float(_TOGGLE_KNOB_MARGIN)
         )
         self._animation.setStartValue(self._knob_x)
         self._animation.setEndValue(end)
         self._animation.start()
+        self.toggled.emit(new_checked)
 
     # -- painting -----------------------------------------------------------
 
@@ -258,8 +283,8 @@ class ToggleSwitch(QAbstractButton):
 
         knob_d = _TOGGLE_HEIGHT - 2 * _TOGGLE_KNOB_MARGIN
 
-        # Track — fixed colors that work on both dark and light backgrounds
-        track_color = QColor("#4a9f4a") if self.isChecked() else QColor("#888888")
+        # Track
+        track_color = QColor("#4a9f4a") if self._checked else QColor("#888888")
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(track_color))
         p.drawRoundedRect(
@@ -267,7 +292,7 @@ class ToggleSwitch(QAbstractButton):
             _TOGGLE_HEIGHT / 2, _TOGGLE_HEIGHT / 2,
         )
 
-        # Knob — white circle with subtle dark border for visibility on any bg
+        # Knob
         p.setPen(QPen(QColor("#b0b0b0"), 1))
         p.setBrush(QBrush(QColor("#ffffff")))
         p.drawEllipse(
@@ -275,32 +300,6 @@ class ToggleSwitch(QAbstractButton):
         )
 
         p.end()
-
-    # -- theme change guard ---------------------------------------------------
-
-    _TRANSPARENT_STYLE = "background: transparent; border: none; padding: 0; margin: 0;"
-
-    def changeEvent(self, event: QEvent) -> None:  # noqa: N802
-        """qdarktheme のテーマ切り替え時にスタイルシートを再適用する。"""
-        super().changeEvent(event)
-        if event.type() == QEvent.Type.PaletteChange:
-            # PaletteChange はテーマ切り替え時のみ発火する。
-            # StyleChange は setStyleSheet 自身が発火するためここでは使わない。
-            if self.styleSheet() != self._TRANSPARENT_STYLE:
-                self.setStyleSheet(self._TRANSPARENT_STYLE)
-            self.update()
-
-    # -- override click to emit toggle (already handled by QAbstractButton) -
-
-    def setChecked(self, checked: bool) -> None:  # noqa: N802
-        """Override to snap knob position when set programmatically."""
-        knob_d = _TOGGLE_HEIGHT - 2 * _TOGGLE_KNOB_MARGIN
-        self._knob_x = (
-            float(_TOGGLE_WIDTH - _TOGGLE_KNOB_MARGIN - knob_d)
-            if checked
-            else float(_TOGGLE_KNOB_MARGIN)
-        )
-        super().setChecked(checked)
 
 
 class _MeterBar(QWidget):
