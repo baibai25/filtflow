@@ -7,7 +7,7 @@
 ## 動作環境
 
 - OS: Windows 10 / 11
-- Python: 3.10 以上
+- Python: 3.13.5 以上
 - 仮想オーディオデバイス: [VB-Cable](https://vb-audio.com/Cable/)（別途インストール要）
 
 ## セットアップ
@@ -101,7 +101,7 @@ Filtflow/
 ├── compressor.py        コンプレッサーフィルタ（OBS 準拠）
 ├── expander.py          エキスパンダーフィルタ（OBS 準拠）
 ├── config.py            設定値の定義・ロード・保存
-├── ui.py                設定 UI（tkinter）
+├── ui.py                設定 UI（PySide6）
 ├── tray.py              タスクトレイ常駐（pystray）
 ├── filtflow.spec        PyInstaller ビルド設定
 ├── requirements.txt
@@ -141,7 +141,8 @@ uv run pyinstaller filtflow.spec
 | numpy | 信号処理 |
 | pystray | タスクトレイ常駐 |
 | Pillow | トレイアイコン画像処理 |
-| tkinter | 設定 UI（Python 標準ライブラリ） |
+| PySide6 | 設定 UI（Qt6） |
+| pyqtdarktheme | ダーク/ライトテーマ切替 |
 
 依存関係は `pyproject.toml` で管理し、`uv` で解決する。
 

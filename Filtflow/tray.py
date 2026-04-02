@@ -20,20 +20,20 @@ ICON_PNG: Path = ASSETS_DIR / "icon.png"
 ICON_SIZE: int = 64
 
 
-def _generate_icon() -> Image.Image:
-    """assets/icon.png が存在しない場合にフォールバックアイコンを生成する。
+def _generate_icon(
+    inner_color: tuple[int, int, int, int] = (0, 200, 80, 255),
+) -> Image.Image:
+    """円形フォールバックアイコンを生成する。
 
-    32x32 の円形アイコン（緑ベース）を返す。
+    assets/icon.png が存在しない場合や、状態表示アイコンの生成に使用する。
     """
     img = Image.new("RGBA", (ICON_SIZE, ICON_SIZE), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    # 外円（ダーク）
     draw.ellipse([2, 2, ICON_SIZE - 2, ICON_SIZE - 2], fill=(30, 30, 30, 255))
-    # 内円（緑）
     margin = ICON_SIZE // 5
     draw.ellipse(
         [margin, margin, ICON_SIZE - margin, ICON_SIZE - margin],
-        fill=(0, 200, 80, 255),
+        fill=inner_color,
     )
     return img
 
@@ -90,7 +90,7 @@ class TrayIcon:
     def run_detached(self) -> None:
         """バックグラウンドスレッドでトレイアイコンを起動する。
 
-        メインスレッドで tkinter の mainloop() を実行できるよう、
+        メインスレッドで Qt の event loop を実行できるよう、
         pystray はデーモンスレッドで動かす。
         """
         self._icon = self._build_icon()
@@ -113,16 +113,7 @@ class TrayIcon:
         """エラー状態を示すアイコンに切り替える。"""
         if self._icon is None:
             return
-        img = Image.new("RGBA", (ICON_SIZE, ICON_SIZE), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
-        draw.ellipse([2, 2, ICON_SIZE - 2, ICON_SIZE - 2], fill=(30, 30, 30, 255))
-        margin = ICON_SIZE // 5
-        # 赤で塗る（エラー状態）
-        draw.ellipse(
-            [margin, margin, ICON_SIZE - margin, ICON_SIZE - margin],
-            fill=(220, 50, 50, 255),
-        )
-        self._icon.icon = img
+        self._icon.icon = _generate_icon(inner_color=(220, 50, 50, 255))
 
     def set_normal_state(self) -> None:
         """通常状態のアイコンに戻す。"""
