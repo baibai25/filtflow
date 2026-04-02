@@ -12,8 +12,16 @@ from typing import Callable
 
 import qdarktheme
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import (
+    Property,
+    QEasingCurve,
+    QPropertyAnimation,
+    QSize,
+    Qt,
+    QTimer,
+)
 from PySide6.QtGui import (
+    QBrush,
     QCloseEvent,
     QColor,
     QFont,
@@ -23,10 +31,10 @@ from PySide6.QtGui import (
     QPen,
 )
 from PySide6.QtWidgets import (
+    QAbstractButton,
     QAbstractScrollArea,
     QApplication,
     QButtonGroup,
-    QCheckBox,
     QComboBox,
     QGridLayout,
     QGroupBox,
@@ -111,22 +119,6 @@ METER_TICK_MARKS: list[float] = [-60.0, -50.0, -40.0, -30.0, -20.0, -10.0, 0.0]
 
 BLOCK_SIZE_OPTIONS: list[str] = ["128", "256", "480", "512", "960", "1024"]
 
-# フィルタ有効/無効トグルスイッチのスタイル
-_TOGGLE_SWITCH_STYLE: str = """
-    QCheckBox {
-        spacing: 0px;
-    }
-    QCheckBox::indicator {
-        width: 36px;
-        height: 18px;
-        border-radius: 9px;
-        background-color: palette(mid);
-    }
-    QCheckBox::indicator:checked {
-        background-color: palette(highlight);
-    }
-"""
-
 # フィルタ名ラベルの無効時スタイル
 _FILTER_DISABLED_STYLE: str = "color: palette(mid); text-decoration: line-through;"
 
@@ -188,6 +180,106 @@ def apply_appearance_mode(mode: str) -> None:
 
     _applied_appearance_mode = normalized
     qdarktheme.setup_theme(normalized)
+
+
+# ---------------------------------------------------------------------------
+# iOS / Android 風トグルスイッチ
+# ---------------------------------------------------------------------------
+
+# トグルスイッチのサイズ定数
+_TOGGLE_WIDTH: int = 40
+_TOGGLE_HEIGHT: int = 22
+_TOGGLE_KNOB_MARGIN: int = 3
+
+
+class ToggleSwitch(QAbstractButton):
+    """iOS/Android 風の pill-shaped トグルスイッチ。
+
+    QAbstractButton を継承するため isChecked() / setChecked() / toggled シグナル
+    などが QCheckBox と同様に使える。ノブは QPropertyAnimation でスライドする。
+    palette(mid) / palette(highlight) を使用し、ダーク・ライト両テーマに対応。
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setCheckable(True)
+        # ノブの X 位置（アニメーション用プロパティ）
+        self._knob_x: float = float(_TOGGLE_KNOB_MARGIN)
+        self._animation = QPropertyAnimation(self, b"knob_x", self)
+        self._animation.setDuration(120)
+        self._animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self.toggled.connect(self._start_animation)
+
+    # -- Qt property for animation ------------------------------------------
+
+    def _get_knob_x(self) -> float:
+        return self._knob_x
+
+    def _set_knob_x(self, value: float) -> None:
+        self._knob_x = value
+        self.update()
+
+    knob_x = Property(float, _get_knob_x, _set_knob_x)  # type: ignore[assignment]
+
+    # -- size hints ---------------------------------------------------------
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        return QSize(_TOGGLE_WIDTH, _TOGGLE_HEIGHT)
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        return self.sizeHint()
+
+    # -- animation ----------------------------------------------------------
+
+    def _start_animation(self, checked: bool) -> None:
+        self._animation.stop()
+        knob_d = _TOGGLE_HEIGHT - 2 * _TOGGLE_KNOB_MARGIN
+        end = (
+            float(_TOGGLE_WIDTH - _TOGGLE_KNOB_MARGIN - knob_d)
+            if checked
+            else float(_TOGGLE_KNOB_MARGIN)
+        )
+        self._animation.setStartValue(self._knob_x)
+        self._animation.setEndValue(end)
+        self._animation.start()
+
+    # -- painting -----------------------------------------------------------
+
+    def paintEvent(self, _event: QPaintEvent) -> None:  # noqa: N802
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        pal = self.palette()
+        knob_d = _TOGGLE_HEIGHT - 2 * _TOGGLE_KNOB_MARGIN
+
+        # Track
+        track_color = pal.highlight().color() if self.isChecked() else pal.mid().color()
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(track_color))
+        p.drawRoundedRect(
+            0, 0, _TOGGLE_WIDTH, _TOGGLE_HEIGHT,
+            _TOGGLE_HEIGHT / 2, _TOGGLE_HEIGHT / 2,
+        )
+
+        # Knob
+        p.setBrush(QBrush(pal.brightText().color()))
+        p.drawEllipse(
+            int(self._knob_x), _TOGGLE_KNOB_MARGIN, knob_d, knob_d,
+        )
+
+        p.end()
+
+    # -- override click to emit toggle (already handled by QAbstractButton) -
+
+    def setChecked(self, checked: bool) -> None:  # noqa: N802
+        """Override to snap knob position when set programmatically."""
+        knob_d = _TOGGLE_HEIGHT - 2 * _TOGGLE_KNOB_MARGIN
+        self._knob_x = (
+            float(_TOGGLE_WIDTH - _TOGGLE_KNOB_MARGIN - knob_d)
+            if checked
+            else float(_TOGGLE_KNOB_MARGIN)
+        )
+        super().setChecked(checked)
 
 
 class _MeterBar(QWidget):
@@ -601,11 +693,10 @@ class SettingsWindow(QWidget):
         self._exp_label = QLabel("Expander")
         exp_item_layout.addWidget(self._exp_label)
         exp_item_layout.addStretch()
-        self._exp_enabled = QCheckBox()
-        self._exp_enabled.setStyleSheet(_TOGGLE_SWITCH_STYLE)
+        self._exp_enabled = ToggleSwitch()
         self._exp_enabled.setChecked(self._config.expander.enabled)
-        self._exp_enabled.stateChanged.connect(
-            lambda _state: self._on_exp_enabled_change()
+        self._exp_enabled.toggled.connect(
+            lambda _checked: self._on_exp_enabled_change()
         )
         exp_item_layout.addWidget(self._exp_enabled)
         self._filter_list.addItem(exp_item)
@@ -620,11 +711,10 @@ class SettingsWindow(QWidget):
         self._comp_label = QLabel("Compressor")
         comp_item_layout.addWidget(self._comp_label)
         comp_item_layout.addStretch()
-        self._comp_enabled = QCheckBox()
-        self._comp_enabled.setStyleSheet(_TOGGLE_SWITCH_STYLE)
+        self._comp_enabled = ToggleSwitch()
         self._comp_enabled.setChecked(self._config.compressor.enabled)
-        self._comp_enabled.stateChanged.connect(
-            lambda _state: self._on_comp_enabled_change()
+        self._comp_enabled.toggled.connect(
+            lambda _checked: self._on_comp_enabled_change()
         )
         comp_item_layout.addWidget(self._comp_enabled)
         self._filter_list.addItem(comp_item)
