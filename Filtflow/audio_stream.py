@@ -1,7 +1,7 @@
 """デバイス列挙・WASAPI ストリーム管理
 
 sounddevice を使って WASAPI ストリームを開通し、
-コールバック経由でフィルタチェーン（Compressor → Expander）を呼び出す。
+コールバック経由でフィルタチェーン（Expander → Compressor）を呼び出す。
 """
 
 from __future__ import annotations
@@ -137,7 +137,7 @@ class AudioStream:
 
         audio: np.ndarray = indata.copy()
 
-        # フィルタチェーン適用: Compressor → Expander
+        # フィルタチェーン適用: Expander → Compressor
         for fn in self._filter_chain:
             audio = fn(audio)
 

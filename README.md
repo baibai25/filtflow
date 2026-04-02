@@ -1,5 +1,7 @@
 # Filtflow
 
+[English](docs/README_en.md)
+
 任意のマイク入力にエキスパンダーとコンプレッサーをリアルタイム適用し、Windows 上の全アプリケーションにフィルタ済み音声を提供する常駐ツール。
 
 フィルタアルゴリズムは **OBS Studio のソースコード（MIT ライセンス）に完全準拠**。
@@ -24,26 +26,26 @@ uv run python Filtflow/main.py
 ```
 
 起動するとウィンドウは表示されずタスクトレイにアイコンが常駐する。
-トレイアイコンを右クリック →「設定を開く」で設定ウィンドウを呼び出す。
+トレイアイコンを右クリック →「Settings」で設定ウィンドウを呼び出す。
 
 ## 機能
 
 ### フィルタチェーン
 
 ```
-マイク入力 → [Compressor] → [Expander] → VB-Cable Input
+マイク入力 → [Expander] → [Compressor] → VB-Cable Input
 ```
 
 | フィルタ | 参照元 | 説明 |
 |---------|--------|------|
-| Compressor | `compressor-filter.c` | ピーク検出によるダイナミックコンプレッション |
 | Expander / Gate | `expander-filter.c` | RMS/peak 検出によるノイズ除去・エキスパンション |
+| Compressor | `compressor-filter.c` | ピーク検出によるダイナミックコンプレッション |
 
 ### 設定 UI
 
 - **デバイス選択**: 入力マイク・出力（VB-Cable）をドロップダウンで切替
-- **Compressor**: Ratio / Threshold / Attack / Release / Output Gain をリアルタイム調整
 - **Expander**: Preset（expander / gate）/ Ratio / Threshold / Attack / Release / Output Gain / Detector（RMS / peak）をリアルタイム調整
+- **Compressor**: Ratio / Threshold / Attack / Release / Output Gain をリアルタイム調整
 - **レベルメーター**: フィルタ後の OUT レベルを OBS 準拠3色で表示（30ms 更新・2秒ピーク保持）
 - **保存 / デフォルトに戻す**: 設定を JSON 保存、OBS デフォルト値にリセット
 
@@ -52,26 +54,14 @@ uv run python Filtflow/main.py
 起動時はウィンドウなしでトレイに常駐。右クリックメニュー:
 
 ```
-Filtflow  動作中 ✓
-─────────────────────
-設定を開く
-─────────────────────
-終了
+Settings
+─────────
+Quit
 ```
 
-デバイスエラー時はアイコンが赤に変わる。3 秒後に自動再接続を試みる。
+デバイスエラー時はアイコンが赤に変わる。
 
 ## パラメータ一覧（OBS デフォルト値）
-
-### Compressor
-
-| パラメータ | 範囲 | デフォルト |
-|-----------|------|-----------|
-| Ratio | 1.0 – 32.0 | 10.0 |
-| Threshold | -60 – 0 dB | -18.0 dB |
-| Attack | 1 – 100 ms | 6 ms |
-| Release | 1 – 1000 ms | 60 ms |
-| Output Gain | -32 – 32 dB | 0.0 dB |
 
 ### Expander
 
@@ -83,6 +73,16 @@ Filtflow  動作中 ✓
 | Release | 1 – 1000 ms | 50 ms | 125 ms |
 | Output Gain | -32 – 32 dB | 0.0 dB | 0.0 dB |
 | Detector | RMS / peak | RMS | RMS |
+
+### Compressor
+
+| パラメータ | 範囲 | デフォルト |
+|-----------|------|-----------|
+| Ratio | 1.0 – 32.0 | 10.0 |
+| Threshold | -60 – 0 dB | -18.0 dB |
+| Attack | 1 – 100 ms | 6 ms |
+| Release | 1 – 1000 ms | 60 ms |
+| Output Gain | -32 – 32 dB | 0.0 dB |
 
 ## 設定ファイル
 
@@ -104,7 +104,6 @@ Filtflow/
 ├── ui.py                設定 UI（PySide6）
 ├── tray.py              タスクトレイ常駐（pystray）
 ├── filtflow.spec        PyInstaller ビルド設定
-├── requirements.txt
 └── assets/
     ├── create_icons.py  icon.png / icon.ico 生成スクリプト
     ├── icon.png         トレイアイコン（create_icons.py で生成）
