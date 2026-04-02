@@ -19,13 +19,12 @@ import sys
 from typing import Callable
 
 import numpy as np
-from PySide6.QtCore import QObject, QTimer, Signal, Qt
-from PySide6.QtWidgets import QApplication
-
 from audio_stream import AudioStream, find_device_index
 from compressor import Compressor
 from config import Config
 from expander import Expander
+from PySide6.QtCore import QObject, Qt, QTimer, Signal
+from PySide6.QtWidgets import QApplication
 from tray import TrayIcon
 from ui import SettingsWindow, apply_appearance_mode
 

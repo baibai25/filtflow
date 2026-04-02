@@ -11,45 +11,6 @@ import queue
 from typing import Callable
 
 import qdarktheme
-
-from PySide6.QtCore import (
-    Property,
-    QEasingCurve,
-    QPropertyAnimation,
-    QSize,
-    Signal,
-    Qt,
-    QTimer,
-)
-from PySide6.QtGui import (
-    QBrush,
-    QCloseEvent,
-    QColor,
-    QFont,
-    QMouseEvent,
-    QFontMetrics,
-    QPaintEvent,
-    QPainter,
-    QPen,
-)
-from PySide6.QtWidgets import (
-    QAbstractScrollArea,
-    QApplication,
-    QButtonGroup,
-    QComboBox,
-    QGridLayout,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QListWidget,
-    QListWidgetItem,
-    QPushButton,
-    QSlider,
-    QStackedWidget,
-    QVBoxLayout,
-    QWidget,
-)
-
 from audio_stream import (
     AudioStream,
     find_device_index,
@@ -94,6 +55,43 @@ from expander import (
     PRESET_EXPANDER,
     PRESET_GATE,
     Expander,
+)
+from PySide6.QtCore import (
+    Property,
+    QEasingCurve,
+    QPropertyAnimation,
+    QSize,
+    Qt,
+    QTimer,
+    Signal,
+)
+from PySide6.QtGui import (
+    QBrush,
+    QCloseEvent,
+    QColor,
+    QFont,
+    QFontMetrics,
+    QMouseEvent,
+    QPainter,
+    QPaintEvent,
+    QPen,
+)
+from PySide6.QtWidgets import (
+    QAbstractScrollArea,
+    QApplication,
+    QButtonGroup,
+    QComboBox,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QSlider,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 # --- OBS 準拠レベルメーターの色しきい値 ---
@@ -188,9 +186,9 @@ def apply_appearance_mode(mode: str) -> None:
 # ---------------------------------------------------------------------------
 
 # トグルスイッチのサイズ定数
-_TOGGLE_WIDTH: int = 40
-_TOGGLE_HEIGHT: int = 22
-_TOGGLE_KNOB_MARGIN: int = 3
+_TOGGLE_WIDTH: int = 34
+_TOGGLE_HEIGHT: int = 18
+_TOGGLE_KNOB_MARGIN: int = 2
 
 
 class ToggleSwitch(QWidget):
@@ -288,15 +286,22 @@ class ToggleSwitch(QWidget):
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(track_color))
         p.drawRoundedRect(
-            0, 0, _TOGGLE_WIDTH, _TOGGLE_HEIGHT,
-            _TOGGLE_HEIGHT / 2, _TOGGLE_HEIGHT / 2,
+            0,
+            0,
+            _TOGGLE_WIDTH,
+            _TOGGLE_HEIGHT,
+            _TOGGLE_HEIGHT / 2,
+            _TOGGLE_HEIGHT / 2,
         )
 
         # Knob
         p.setPen(QPen(QColor("#b0b0b0"), 1))
         p.setBrush(QBrush(QColor("#ffffff")))
         p.drawEllipse(
-            int(self._knob_x), _TOGGLE_KNOB_MARGIN, knob_d, knob_d,
+            int(self._knob_x),
+            _TOGGLE_KNOB_MARGIN,
+            knob_d,
+            knob_d,
         )
 
         p.end()
@@ -640,6 +645,7 @@ class SettingsWindow(QWidget):
         meter_layout.setContentsMargins(6, 6, 6, 6)
         meter_layout.addWidget(LevelMeter(meter_group, level_queue))
         main_layout.addWidget(meter_group)
+        main_layout.addSpacing(6)
 
         # --- 上部: Device ---
         dev_group = QGroupBox("Device")
@@ -654,16 +660,12 @@ class SettingsWindow(QWidget):
 
         grid.addWidget(QLabel("Input Device:"), 0, 0)
         self._input_combo = QComboBox()
-        self._input_combo.currentIndexChanged.connect(
-            lambda _idx: self._on_device_change()
-        )
+        self._input_combo.currentIndexChanged.connect(lambda _idx: self._on_device_change())
         grid.addWidget(self._input_combo, 0, 1, 1, 2)
 
         grid.addWidget(QLabel("Output Device:"), 1, 0)
         self._output_combo = QComboBox()
-        self._output_combo.currentIndexChanged.connect(
-            lambda _idx: self._on_device_change()
-        )
+        self._output_combo.currentIndexChanged.connect(lambda _idx: self._on_device_change())
         grid.addWidget(self._output_combo, 1, 1, 1, 2)
 
         grid.addWidget(QLabel("Block Size:"), 2, 0)
@@ -679,6 +681,7 @@ class SettingsWindow(QWidget):
         samples_lbl.setStyleSheet(_MUTED_STYLE)
         grid.addWidget(samples_lbl, 2, 2)
         main_layout.addWidget(dev_group)
+        main_layout.addSpacing(6)
 
         # --- 下部メイン: フィルタ選択 + 詳細編集 (OBSスタイル) ---
         filter_group = QGroupBox("Audio Filters")
@@ -695,12 +698,8 @@ class SettingsWindow(QWidget):
         left_layout.setSpacing(4)
 
         self._filter_list = QListWidget()
-        self._filter_list.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-        self._filter_list.setSizeAdjustPolicy(
-            QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents
-        )
+        self._filter_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._filter_list.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents)
 
         # Expander アイテム (処理順: Expander → Compressor)
         exp_item = QListWidgetItem()
@@ -712,10 +711,8 @@ class SettingsWindow(QWidget):
         exp_item_layout.addWidget(self._exp_label, 1)
         self._exp_enabled = ToggleSwitch()
         self._exp_enabled.setChecked(self._config.expander.enabled)
-        self._exp_enabled.toggled.connect(
-            lambda _checked: self._on_exp_enabled_change()
-        )
-        exp_item_layout.addWidget(self._exp_enabled)
+        self._exp_enabled.toggled.connect(lambda _checked: self._on_exp_enabled_change())
+        exp_item_layout.addWidget(self._exp_enabled, 0, Qt.AlignmentFlag.AlignVCenter)
         self._filter_list.addItem(exp_item)
         exp_item.setSizeHint(exp_widget.sizeHint())
         self._filter_list.setItemWidget(exp_item, exp_widget)
@@ -730,10 +727,8 @@ class SettingsWindow(QWidget):
         comp_item_layout.addWidget(self._comp_label, 1)
         self._comp_enabled = ToggleSwitch()
         self._comp_enabled.setChecked(self._config.compressor.enabled)
-        self._comp_enabled.toggled.connect(
-            lambda _checked: self._on_comp_enabled_change()
-        )
-        comp_item_layout.addWidget(self._comp_enabled)
+        self._comp_enabled.toggled.connect(lambda _checked: self._on_comp_enabled_change())
+        comp_item_layout.addWidget(self._comp_enabled, 0, Qt.AlignmentFlag.AlignVCenter)
         self._filter_list.addItem(comp_item)
         comp_item.setSizeHint(comp_widget.sizeHint())
         self._filter_list.setItemWidget(comp_item, comp_widget)

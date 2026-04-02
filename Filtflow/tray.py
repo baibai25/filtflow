@@ -68,11 +68,9 @@ class TrayIcon:
 
     def _build_icon(self) -> pystray.Icon:
         menu = pystray.Menu(
-            pystray.MenuItem("Filtflow  動作中 ✓", None, enabled=False),
+            pystray.MenuItem("Settings", self._handle_open_settings),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("設定を開く", self._handle_open_settings),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem("終了", self._handle_quit),
+            pystray.MenuItem("Quit", self._handle_quit),
         )
         return pystray.Icon(
             name="Filtflow",
