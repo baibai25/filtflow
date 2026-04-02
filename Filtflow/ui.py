@@ -113,33 +113,31 @@ BLOCK_SIZE_OPTIONS: list[str] = ["128", "256", "480", "512", "960", "1024"]
 # palette(mid) はテーマに追従するため、ダーク・ライト問わず適切なコントラストになる
 _MUTED_STYLE: str = "color: palette(mid);"
 
-# 外観切り替えボタンのスタイル（固定色でダーク／ライトを視覚的に区別）
-_DARK_BTN_STYLE: str = """
+# 外観切り替えトグルのスタイル（セグメントコントロール風・palette のみで統一）
+# Dark / Light が連結して1つのコントロールに見えるよう角丸を片側のみに設定する
+# setObjectName("darkToggle") / setObjectName("lightToggle") と組み合わせて使う
+_TOGGLE_BTN_STYLE: str = """
     QPushButton {
-        background-color: #2b2b2b;
-        color: #dddddd;
-        border: 2px solid #555555;
+        background-color: palette(button);
+        color: palette(button-text);
+        border: 1px solid palette(mid);
         padding: 4px 16px;
-        border-radius: 4px;
+        border-radius: 0px;
     }
-    QPushButton:hover:!checked { background-color: #383838; }
+    QPushButton:hover:!checked { background-color: palette(midlight); }
     QPushButton:checked {
-        border: 2px solid #2a82da;
-        color: #ffffff;
+        background-color: palette(highlight);
+        color: palette(highlighted-text);
+        border-color: palette(highlight);
     }
-"""
-_LIGHT_BTN_STYLE: str = """
-    QPushButton {
-        background-color: #e8e8e8;
-        color: #333333;
-        border: 2px solid #aaaaaa;
-        padding: 4px 16px;
-        border-radius: 4px;
+    QPushButton#darkToggle {
+        border-top-left-radius: 4px;
+        border-bottom-left-radius: 4px;
     }
-    QPushButton:hover:!checked { background-color: #d8d8d8; }
-    QPushButton:checked {
-        border: 2px solid #2a82da;
-        color: #111111;
+    QPushButton#lightToggle {
+        border-top-right-radius: 4px;
+        border-bottom-right-radius: 4px;
+        border-left: none;
     }
 """
 
@@ -760,14 +758,16 @@ class SettingsWindow(QWidget):
 
         btn_layout.addStretch()
 
-        # 外観切り替えボタングループ（横並び・固定配色）
+        # 外観切り替えトグル（セグメントコントロール風・テーマ色に統一）
         self._dark_btn = QPushButton("Dark")
         self._dark_btn.setCheckable(True)
-        self._dark_btn.setStyleSheet(_DARK_BTN_STYLE)
+        self._dark_btn.setObjectName("darkToggle")
+        self._dark_btn.setStyleSheet(_TOGGLE_BTN_STYLE)
 
         self._light_btn = QPushButton("Light")
         self._light_btn.setCheckable(True)
-        self._light_btn.setStyleSheet(_LIGHT_BTN_STYLE)
+        self._light_btn.setObjectName("lightToggle")
+        self._light_btn.setStyleSheet(_TOGGLE_BTN_STYLE)
 
         self._appearance_group = QButtonGroup(self)
         self._appearance_group.setExclusive(True)
