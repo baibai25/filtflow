@@ -623,7 +623,7 @@ class SettingsWindow(QWidget):
         self._comp_release = _SliderRow(
             comp_group,
             "Release",
-            COMP_MIN_ATK_RLS_MS,
+            5,
             COMP_MAX_RLS_MS,
             5,
             self._config.compressor.release_ms,
@@ -719,7 +719,7 @@ class SettingsWindow(QWidget):
         self._exp_release = _SliderRow(
             exp_group,
             "Release",
-            EXP_MIN_ATK_RLS_MS,
+            5,
             EXP_MAX_RLS_MS,
             5,
             self._config.expander.release_ms,
