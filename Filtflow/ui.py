@@ -240,7 +240,7 @@ class ToggleSwitch(QWidget):
         self._knob_x = value
         self.update()
 
-    knob_x = Property(float, _get_knob_x, _set_knob_x)  # type: ignore[assignment]
+    knob_x = Property(float, _get_knob_x, _set_knob_x)
 
     # -- size hints ---------------------------------------------------------
 
@@ -769,7 +769,7 @@ class SettingsWindow(QWidget):
             0.5,
             self._config.expander.ratio,
             ":1",
-            lambda v: (self._expander.update_params(ratio=v), self._schedule_save()),
+            lambda v: self._update_exp(ratio=v),
         )
         exp_page_layout.addWidget(self._exp_ratio)
 
@@ -781,7 +781,7 @@ class SettingsWindow(QWidget):
             0.5,
             self._config.expander.threshold_db,
             "dB",
-            lambda v: (self._expander.update_params(threshold=v), self._schedule_save()),
+            lambda v: self._update_exp(threshold=v),
         )
         exp_page_layout.addWidget(self._exp_threshold)
 
@@ -793,7 +793,7 @@ class SettingsWindow(QWidget):
             1,
             self._config.expander.attack_ms,
             "ms",
-            lambda v: (self._expander.update_params(attack_ms=int(v)), self._schedule_save()),
+            lambda v: self._update_exp(attack_ms=int(v)),
         )
         exp_page_layout.addWidget(self._exp_attack)
 
@@ -805,7 +805,7 @@ class SettingsWindow(QWidget):
             5,
             self._config.expander.release_ms,
             "ms",
-            lambda v: (self._expander.update_params(release_ms=int(v)), self._schedule_save()),
+            lambda v: self._update_exp(release_ms=int(v)),
         )
         exp_page_layout.addWidget(self._exp_release)
 
@@ -817,7 +817,7 @@ class SettingsWindow(QWidget):
             0.5,
             self._config.expander.output_gain_db,
             "dB",
-            lambda v: (self._expander.update_params(output_gain_db=v), self._schedule_save()),
+            lambda v: self._update_exp(output_gain_db=v),
         )
         exp_page_layout.addWidget(self._exp_output_gain)
 
@@ -855,7 +855,7 @@ class SettingsWindow(QWidget):
             0.5,
             self._config.compressor.ratio,
             ":1",
-            lambda v: (self._compressor.update_params(ratio=v), self._schedule_save()),
+            lambda v: self._update_comp(ratio=v),
         )
         comp_page_layout.addWidget(self._comp_ratio)
 
@@ -867,7 +867,7 @@ class SettingsWindow(QWidget):
             0.5,
             self._config.compressor.threshold_db,
             "dB",
-            lambda v: (self._compressor.update_params(threshold=v), self._schedule_save()),
+            lambda v: self._update_comp(threshold=v),
         )
         comp_page_layout.addWidget(self._comp_threshold)
 
@@ -879,7 +879,7 @@ class SettingsWindow(QWidget):
             1,
             self._config.compressor.attack_ms,
             "ms",
-            lambda v: (self._compressor.update_params(attack_ms=int(v)), self._schedule_save()),
+            lambda v: self._update_comp(attack_ms=int(v)),
         )
         comp_page_layout.addWidget(self._comp_attack)
 
@@ -891,7 +891,7 @@ class SettingsWindow(QWidget):
             5,
             self._config.compressor.release_ms,
             "ms",
-            lambda v: (self._compressor.update_params(release_ms=int(v)), self._schedule_save()),
+            lambda v: self._update_comp(release_ms=int(v)),
         )
         comp_page_layout.addWidget(self._comp_release)
 
@@ -903,7 +903,7 @@ class SettingsWindow(QWidget):
             0.5,
             self._config.compressor.output_gain_db,
             "dB",
-            lambda v: (self._compressor.update_params(output_gain_db=v), self._schedule_save()),
+            lambda v: self._update_comp(output_gain_db=v),
         )
         comp_page_layout.addWidget(self._comp_output_gain)
 
@@ -1043,6 +1043,14 @@ class SettingsWindow(QWidget):
         mode = "dark" if btn_id == _APPEARANCE_ID_DARK else "light"
         apply_appearance_mode(mode)
         self._config.appearance_mode = mode
+        self._schedule_save()
+
+    def _update_exp(self, **kw: float) -> None:
+        self._expander.update_params(**kw)
+        self._schedule_save()
+
+    def _update_comp(self, **kw: float) -> None:
+        self._compressor.update_params(**kw)
         self._schedule_save()
 
     def _schedule_save(self) -> None:
