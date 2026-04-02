@@ -86,6 +86,8 @@ class TestCompressor:
 
     def test_update_params(self) -> None:
         comp = self._make_compressor()
-        comp.update_params(ratio=2.0, threshold=-30.0, attack_ms=10, release_ms=100, output_gain_db=3.0)
+        comp.update_params(
+            ratio=2.0, threshold=-30.0, attack_ms=10, release_ms=100, output_gain_db=3.0
+        )
         assert comp._ratio == 2.0
         assert comp._threshold == -30.0

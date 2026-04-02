@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from Filtflow.expander import Expander, DETECTOR_PEAK, DETECTOR_RMS
+from Filtflow.expander import DETECTOR_PEAK, DETECTOR_RMS, Expander
 
 
 class TestExpander:
@@ -21,7 +21,7 @@ class TestExpander:
             "enabled": True,
         }
         defaults.update(kwargs)
-        return Expander(**defaults)  # type: ignore[arg-type]
+        return Expander(**defaults)
 
     def test_silence_stays_silent(self) -> None:
         exp = self._make_expander()

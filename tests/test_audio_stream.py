@@ -41,7 +41,7 @@ class TestAudioStreamCallback:
         indata = np.ones((480, 1), dtype=np.float32) * 0.5
         outdata = np.zeros((480, 1), dtype=np.float32)
 
-        stream._callback(indata, outdata, 480, None, None)  # type: ignore[arg-type]
+        stream._callback(indata, outdata, 480, None, None)
         np.testing.assert_allclose(outdata, 1.0)
 
     def test_callback_chain_order(self) -> None:
@@ -66,7 +66,7 @@ class TestAudioStreamCallback:
 
         indata = np.ones((480, 1), dtype=np.float32) * 0.5
         outdata = np.zeros((480, 1), dtype=np.float32)
-        stream._callback(indata, outdata, 480, None, None)  # type: ignore[arg-type]
+        stream._callback(indata, outdata, 480, None, None)
 
         assert log == ["a", "b"]
         # (0.5 + 0.1) * 2.0 = 1.2
@@ -86,7 +86,7 @@ class TestAudioStreamCallback:
 
         indata = np.ones((480, 1), dtype=np.float32) * 0.5
         outdata = np.zeros((480, 1), dtype=np.float32)
-        stream._callback(indata, outdata, 480, None, None)  # type: ignore[arg-type]
+        stream._callback(indata, outdata, 480, None, None)
 
         assert not level_q.empty()
         level_db = level_q.get_nowait()
@@ -104,7 +104,7 @@ class TestAudioStreamCallback:
         )
         try:
             stream.start()
-            assert False, "Expected RuntimeError"
+            raise AssertionError("Expected RuntimeError")
         except RuntimeError:
             assert stream.error is not None
 
@@ -119,6 +119,6 @@ class TestAudioStreamCallback:
         )
         try:
             stream.start()
-            assert False, "Expected RuntimeError"
+            raise AssertionError("Expected RuntimeError")
         except RuntimeError:
             assert stream.error is not None

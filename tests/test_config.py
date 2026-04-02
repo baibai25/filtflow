@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from Filtflow.config import CompressorConfig, Config, ExpanderConfig
 
 
@@ -48,7 +50,9 @@ class TestConfigSaveLoad:
         assert loaded.compressor.ratio == 5.0
         assert loaded.expander.threshold_db == -30.0
 
-    def test_load_missing_file_creates_default(self, tmp_path: Path, monkeypatch: "pytest.MonkeyPatch") -> None:
+    def test_load_missing_file_creates_default(
+        self, tmp_path: Path, monkeypatch: "pytest.MonkeyPatch"
+    ) -> None:
         import Filtflow.config as config_mod
 
         monkeypatch.setattr(config_mod, "CONFIG_DIR", tmp_path)
@@ -58,7 +62,9 @@ class TestConfigSaveLoad:
         assert cfg.sample_rate == 48000
         assert (tmp_path / "config.json").exists()
 
-    def test_legacy_appearance_mode(self, tmp_path: Path, monkeypatch: "pytest.MonkeyPatch") -> None:
+    def test_legacy_appearance_mode(
+        self, tmp_path: Path, monkeypatch: "pytest.MonkeyPatch"
+    ) -> None:
         import Filtflow.config as config_mod
 
         monkeypatch.setattr(config_mod, "CONFIG_DIR", tmp_path)
