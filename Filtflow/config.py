@@ -70,7 +70,14 @@ class Config:
         )
         cfg.sample_rate = int(data.get("sample_rate", 48000))
         cfg.block_size = int(data.get("block_size", 480))
-        cfg.appearance_mode = str(data.get("appearance_mode", "dark"))
+        raw_mode = str(data.get("appearance_mode", "dark"))
+        # qt-material テーマ名（旧形式）を dark / light に正規化する
+        if raw_mode.startswith("dark"):
+            cfg.appearance_mode = "dark"
+        elif raw_mode.startswith("light"):
+            cfg.appearance_mode = "light"
+        else:
+            cfg.appearance_mode = "dark"
 
         comp = data.get("compressor", {})
         if isinstance(comp, dict):
