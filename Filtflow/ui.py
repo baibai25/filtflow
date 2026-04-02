@@ -13,6 +13,7 @@ from typing import Callable
 import qdarktheme
 
 from PySide6.QtCore import (
+    QEvent,
     Property,
     QEasingCurve,
     QPropertyAnimation,
@@ -203,6 +204,12 @@ class ToggleSwitch(QAbstractButton):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setCheckable(True)
+        self.setFixedSize(_TOGGLE_WIDTH, _TOGGLE_HEIGHT)
+        # qdarktheme のグローバルスタイルシートが QAbstractButton に背景を描画し
+        # カスタム paintEvent を覆い隠すのを防ぐ
+        self.setStyleSheet(
+            "background: transparent; border: none; padding: 0; margin: 0;"
+        )
         # ノブの X 位置（アニメーション用プロパティ）
         self._knob_x: float = float(_TOGGLE_KNOB_MARGIN)
         self._animation = QPropertyAnimation(self, b"knob_x", self)
@@ -268,6 +275,20 @@ class ToggleSwitch(QAbstractButton):
         )
 
         p.end()
+
+    # -- theme change guard ---------------------------------------------------
+
+    _TRANSPARENT_STYLE = "background: transparent; border: none; padding: 0; margin: 0;"
+
+    def changeEvent(self, event: QEvent) -> None:  # noqa: N802
+        """qdarktheme のテーマ切り替え時にスタイルシートを再適用する。"""
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.PaletteChange:
+            # PaletteChange はテーマ切り替え時のみ発火する。
+            # StyleChange は setStyleSheet 自身が発火するためここでは使わない。
+            if self.styleSheet() != self._TRANSPARENT_STYLE:
+                self.setStyleSheet(self._TRANSPARENT_STYLE)
+            self.update()
 
     # -- override click to emit toggle (already handled by QAbstractButton) -
 
