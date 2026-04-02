@@ -23,6 +23,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication,
+    QButtonGroup,
     QCheckBox,
     QComboBox,
     QFrame,
@@ -109,6 +110,40 @@ BLOCK_SIZE_OPTIONS: list[str] = ["128", "256", "480", "512", "960", "1024"]
 
 # グレーアウトテキスト用スタイルシート（範囲表示・補助ラベル等）
 _MUTED_STYLE: str = "color: #999999;"
+
+# 外観切り替えボタンのスタイル（テーマに依存せず固定色で視認性を確保）
+_DARK_BTN_STYLE: str = """
+    QPushButton {
+        background-color: #2b2b2b;
+        color: #dddddd;
+        border: 2px solid #555555;
+        padding: 4px 16px;
+        border-radius: 4px;
+    }
+    QPushButton:hover:!checked { background-color: #383838; }
+    QPushButton:checked {
+        border: 2px solid #2a82da;
+        color: #ffffff;
+    }
+"""
+_LIGHT_BTN_STYLE: str = """
+    QPushButton {
+        background-color: #e8e8e8;
+        color: #333333;
+        border: 2px solid #aaaaaa;
+        padding: 4px 16px;
+        border-radius: 4px;
+    }
+    QPushButton:hover:!checked { background-color: #d8d8d8; }
+    QPushButton:checked {
+        border: 2px solid #2a82da;
+        color: #111111;
+    }
+"""
+
+# QButtonGroup に渡す ID（外観モード識別用）
+_APPEARANCE_ID_DARK: int = 0
+_APPEARANCE_ID_LIGHT: int = 1
 
 # apply_appearance_mode の二重適用を防ぐためのキャッシュ
 _applied_appearance_mode: str = ""
@@ -703,12 +738,28 @@ class SettingsWindow(QWidget):
 
         btn_layout.addStretch()
 
-        self._appearance_combo = QComboBox()
-        self._appearance_combo.addItems(["Dark", "Light"])
-        self._appearance_combo.setCurrentText(self._config.appearance_mode.capitalize())
-        self._appearance_combo.setFixedWidth(140)
-        self._appearance_combo.currentTextChanged.connect(self._on_appearance_change)
-        btn_layout.addWidget(self._appearance_combo)
+        # 外観切り替えボタングループ（横並び・固定配色）
+        self._dark_btn = QPushButton("Dark")
+        self._dark_btn.setCheckable(True)
+        self._dark_btn.setStyleSheet(_DARK_BTN_STYLE)
+
+        self._light_btn = QPushButton("Light")
+        self._light_btn.setCheckable(True)
+        self._light_btn.setStyleSheet(_LIGHT_BTN_STYLE)
+
+        self._appearance_group = QButtonGroup(self)
+        self._appearance_group.setExclusive(True)
+        self._appearance_group.addButton(self._dark_btn, _APPEARANCE_ID_DARK)
+        self._appearance_group.addButton(self._light_btn, _APPEARANCE_ID_LIGHT)
+        self._appearance_group.idClicked.connect(self._on_appearance_change)
+
+        if self._config.appearance_mode.lower() == "dark":
+            self._dark_btn.setChecked(True)
+        else:
+            self._light_btn.setChecked(True)
+
+        btn_layout.addWidget(self._dark_btn)
+        btn_layout.addWidget(self._light_btn)
 
         # --- エラー表示ラベル ---
         self._error_label = QLabel("")
@@ -805,9 +856,10 @@ class SettingsWindow(QWidget):
         self._config.expander.detector = detector
         self._schedule_save()
 
-    def _on_appearance_change(self, mode: str) -> None:
+    def _on_appearance_change(self, btn_id: int) -> None:
+        mode = "dark" if btn_id == _APPEARANCE_ID_DARK else "light"
         apply_appearance_mode(mode)
-        self._config.appearance_mode = mode.lower()
+        self._config.appearance_mode = mode
         self._schedule_save()
 
     def _schedule_save(self) -> None:
