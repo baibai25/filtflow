@@ -57,7 +57,6 @@ def _build_filter_chain(
 
 def main() -> None:
     app = QApplication(sys.argv)
-    app.setStyle("Fusion")
     # 最後のウィンドウを閉じてもイベントループを継続（トレイ常駐のため）
     app.setQuitOnLastWindowClosed(False)
 

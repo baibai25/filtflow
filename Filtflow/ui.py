@@ -10,6 +10,8 @@ from __future__ import annotations
 import queue
 from typing import Callable
 
+import qdarktheme
+
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import (
     QCloseEvent,
@@ -18,7 +20,6 @@ from PySide6.QtGui import (
     QFontMetrics,
     QPaintEvent,
     QPainter,
-    QPalette,
     QPen,
 )
 from PySide6.QtWidgets import (
@@ -109,9 +110,10 @@ METER_TICK_MARKS: list[float] = [-60.0, -50.0, -40.0, -30.0, -20.0, -10.0, 0.0]
 BLOCK_SIZE_OPTIONS: list[str] = ["128", "256", "480", "512", "960", "1024"]
 
 # グレーアウトテキスト用スタイルシート（範囲表示・補助ラベル等）
-_MUTED_STYLE: str = "color: #999999;"
+# palette(mid) はテーマに追従するため、ダーク・ライト問わず適切なコントラストになる
+_MUTED_STYLE: str = "color: palette(mid);"
 
-# 外観切り替えボタンのスタイル（テーマに依存せず固定色で視認性を確保）
+# 外観切り替えボタンのスタイル（固定色でダーク／ライトを視覚的に区別）
 _DARK_BTN_STYLE: str = """
     QPushButton {
         background-color: #2b2b2b;
@@ -145,6 +147,21 @@ _LIGHT_BTN_STYLE: str = """
 _APPEARANCE_ID_DARK: int = 0
 _APPEARANCE_ID_LIGHT: int = 1
 
+# アクションボタン（Defaults / Reset All）のスタイル
+# palette(highlight) でテーマのアクセント色に追従する
+_ACTION_BTN_STYLE: str = """
+    QPushButton {
+        background-color: palette(highlight);
+        color: palette(highlighted-text);
+        border: none;
+        border-radius: 3px;
+        padding: 2px 8px;
+        font-size: 11px;
+    }
+    QPushButton:hover   { border: 1px solid palette(highlighted-text); }
+    QPushButton:pressed { background-color: palette(mid); color: palette(window-text); }
+"""
+
 # apply_appearance_mode の二重適用を防ぐためのキャッシュ
 _applied_appearance_mode: str = ""
 
@@ -152,8 +169,8 @@ _applied_appearance_mode: str = ""
 def apply_appearance_mode(mode: str) -> None:
     """アプリケーション全体の外観モードを適用する（"dark" / "light"）。
 
-    Fusion スタイル + QPalette によるテーマ切り替え。
-    DPI スケーリングは PySide6 が自動的に処理する。
+    PyQtDarkTheme（qdarktheme）によるテーマ切り替え。
+    スタイルシートとパレットを自動設定するため手動設定は不要。
     """
     global _applied_appearance_mode
     normalized = mode.lower()
@@ -165,25 +182,7 @@ def apply_appearance_mode(mode: str) -> None:
         return
 
     _applied_appearance_mode = normalized
-
-    if normalized == "dark":
-        palette = QPalette()
-        palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
-        palette.setColor(QPalette.ColorRole.WindowText, QColor(255, 255, 255))
-        palette.setColor(QPalette.ColorRole.Base, QColor(35, 35, 35))
-        palette.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
-        palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(25, 25, 25))
-        palette.setColor(QPalette.ColorRole.ToolTipText, QColor(255, 255, 255))
-        palette.setColor(QPalette.ColorRole.Text, QColor(255, 255, 255))
-        palette.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
-        palette.setColor(QPalette.ColorRole.ButtonText, QColor(255, 255, 255))
-        palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 0, 0))
-        palette.setColor(QPalette.ColorRole.Link, QColor(42, 130, 218))
-        palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
-        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(35, 35, 35))
-        app.setPalette(palette)
-    else:
-        app.setPalette(app.style().standardPalette())
+    qdarktheme.setup_theme(normalized)
 
 
 class _MeterBar(QWidget):
@@ -630,6 +629,17 @@ class SettingsWindow(QWidget):
         )
         comp_layout.addWidget(self._comp_output_gain)
 
+        comp_bottom = QWidget()
+        comp_bottom_layout = QHBoxLayout(comp_bottom)
+        comp_bottom_layout.setContentsMargins(0, 4, 0, 0)
+        comp_defaults_btn = QPushButton("Defaults")
+        comp_defaults_btn.setFixedWidth(100)
+        comp_defaults_btn.setStyleSheet(_ACTION_BTN_STYLE)
+        comp_defaults_btn.clicked.connect(self._on_comp_reset)
+        comp_bottom_layout.addWidget(comp_defaults_btn)
+        comp_bottom_layout.addStretch()
+        comp_layout.addWidget(comp_bottom)
+
         # --- Expander ---
         exp_group = QGroupBox("Expander")
         scroll_layout.addWidget(exp_group)
@@ -725,16 +735,28 @@ class SettingsWindow(QWidget):
         )
         exp_layout.addWidget(detector_row)
 
+        exp_bottom = QWidget()
+        exp_bottom_layout = QHBoxLayout(exp_bottom)
+        exp_bottom_layout.setContentsMargins(0, 4, 0, 0)
+        exp_defaults_btn = QPushButton("Defaults")
+        exp_defaults_btn.setFixedWidth(100)
+        exp_defaults_btn.setStyleSheet(_ACTION_BTN_STYLE)
+        exp_defaults_btn.clicked.connect(self._on_exp_reset)
+        exp_bottom_layout.addWidget(exp_defaults_btn)
+        exp_bottom_layout.addStretch()
+        exp_layout.addWidget(exp_bottom)
+
         # --- ボタン行 ---
         btn_widget = QWidget()
         btn_layout = QHBoxLayout(btn_widget)
         btn_layout.setContentsMargins(0, 4, 0, 4)
         scroll_layout.addWidget(btn_widget)
 
-        defaults_btn = QPushButton("Defaults")
-        defaults_btn.setFixedWidth(140)
-        defaults_btn.clicked.connect(self._on_reset)
-        btn_layout.addWidget(defaults_btn)
+        reset_all_btn = QPushButton("Reset All")
+        reset_all_btn.setFixedWidth(140)
+        reset_all_btn.setStyleSheet(_ACTION_BTN_STYLE)
+        reset_all_btn.clicked.connect(self._on_reset)
+        btn_layout.addWidget(reset_all_btn)
 
         btn_layout.addStretch()
 
@@ -891,9 +913,8 @@ class SettingsWindow(QWidget):
         except Exception as exc:
             self.show_error(f"Save error: {exc}")
 
-    def _on_reset(self) -> None:
-        """OBS デフォルト値を UI とフィルタに適用する。"""
-        # Compressor
+    def _on_comp_reset(self) -> None:
+        """Compressor を OBS デフォルト値にリセットする。"""
         self._comp_enabled.setChecked(True)
         self._compressor.enabled = True
         self._config.compressor.enabled = True
@@ -909,8 +930,10 @@ class SettingsWindow(QWidget):
             release_ms=COMP_DEFAULT_RELEASE_MS,
             output_gain_db=COMP_DEFAULT_OUTPUT_GAIN_DB,
         )
+        self._schedule_save()
 
-        # Expander
+    def _on_exp_reset(self) -> None:
+        """Expander を OBS デフォルト値にリセットする。"""
         self._exp_enabled.setChecked(True)
         self._expander.enabled = True
         self._config.expander.enabled = True
@@ -931,3 +954,8 @@ class SettingsWindow(QWidget):
             detector=DETECTOR_RMS,
         )
         self._schedule_save()
+
+    def _on_reset(self) -> None:
+        """全フィルタを OBS デフォルト値にリセットする。"""
+        self._on_comp_reset()
+        self._on_exp_reset()
