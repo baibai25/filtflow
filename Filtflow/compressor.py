@@ -1,7 +1,12 @@
 """コンプレッサーフィルタ
 
-OBS Studio の plugins/obs-filters/compressor-filter.c に完全準拠したアルゴリズム。
+OBS Studio の plugins/obs-filters/compressor-filter.c に準拠したアルゴリズム。
 参照箇所: compressor_defaults(), analyze_envelope(), process_compression()
+
+Based on OBS Studio - plugins/obs-filters/compressor-filter.c
+Copyright (C) OBS Project contributors
+Licensed under the GNU General Public License v2 (GPLv2)
+https://github.com/obsproject/obs-studio
 """
 
 from __future__ import annotations

@@ -8,7 +8,7 @@
 Windows上の全アプリケーションに対してフィルタ済み音声を提供する常駐ツール。
 
 フィルタのアルゴリズムおよびパラメータはすべて
-**OBS Studio のソースコード（MITライセンス）に完全準拠**する。
+**OBS Studio のソースコード（GPLv2 ライセンス）に準拠**する。
 
 - compressor: `plugins/obs-filters/compressor-filter.c`
 - expander:   `plugins/obs-filters/expander-filter.c`

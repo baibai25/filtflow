@@ -2,7 +2,7 @@
 
 A resident tool that applies an expander and compressor in real time to any microphone input, delivering filtered audio to all applications on Windows.
 
-Filter algorithms are **fully based on OBS Studio source code (MIT License)**.
+Filter algorithms are **based on OBS Studio source code (GPLv2)**.
 
 ## Requirements
 
@@ -145,4 +145,6 @@ Dependencies are managed in `pyproject.toml` and resolved with `uv`.
 
 ## License
 
-Filter algorithms are based on [OBS Studio](https://github.com/obsproject/obs-studio) (MIT License).
+This project is licensed under the [GNU General Public License v2 (GPLv2)](../LICENSE).
+
+Filter algorithms are based on [OBS Studio](https://github.com/obsproject/obs-studio) (GPLv2).

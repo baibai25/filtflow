@@ -4,7 +4,7 @@
 
 任意のマイク入力にエキスパンダーとコンプレッサーをリアルタイム適用し、Windows 上の全アプリケーションにフィルタ済み音声を提供する常駐ツール。
 
-フィルタアルゴリズムは **OBS Studio のソースコード（MIT ライセンス）に完全準拠**。
+フィルタアルゴリズムは **OBS Studio のソースコード（GPLv2）に準拠**。
 
 ## 動作環境
 
@@ -147,4 +147,6 @@ uv run pyinstaller filtflow.spec
 
 ## ライセンス
 
-フィルタアルゴリズムは [OBS Studio](https://github.com/obsproject/obs-studio)（MIT ライセンス）に準拠。
+本プロジェクトは [GNU General Public License v2 (GPLv2)](LICENSE) の下で公開されています。
+
+フィルタアルゴリズムは [OBS Studio](https://github.com/obsproject/obs-studio)（GPLv2）に準拠。
