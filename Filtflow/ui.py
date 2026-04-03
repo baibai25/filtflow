@@ -950,20 +950,19 @@ class SettingsWindow(QWidget):
         self._filter_stack.setCurrentIndex(0)
         self._filter_list.setCurrentRow(0)
 
-        # --- フッター: バージョン + GitHub リンク ---
+        # --- フッター: バージョン（GitHub リンク付き）右寄せ ---
         footer = QWidget()
         footer_layout = QHBoxLayout(footer)
         footer_layout.setContentsMargins(4, 0, 4, 0)
-        version_label = QLabel(f"Filtflow v{APP_VERSION}")
-        version_label.setStyleSheet(_MUTED_STYLE)
-        footer_layout.addWidget(version_label)
         footer_layout.addStretch()
-        github_link = QPushButton("GitHub")
-        github_link.setFlat(True)
-        github_link.setCursor(Qt.CursorShape.PointingHandCursor)
-        github_link.setStyleSheet("color: palette(link); text-decoration: underline; padding: 0;")
-        github_link.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(GITHUB_URL)))
-        footer_layout.addWidget(github_link)
+        version_link = QPushButton(f"Filtflow v{APP_VERSION}")
+        version_link.setFlat(True)
+        version_link.setCursor(Qt.CursorShape.PointingHandCursor)
+        version_link.setStyleSheet(
+            "color: palette(link); text-decoration: underline; padding: 0;"
+        )
+        version_link.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(GITHUB_URL)))
+        footer_layout.addWidget(version_link)
         main_layout.addWidget(footer)
 
     @staticmethod
