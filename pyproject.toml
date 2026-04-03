@@ -1,6 +1,6 @@
 [project]
 name = "filtflow"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Real-time audio filter for Windows microphone input via WASAPI"
 license = "GPL-2.0-only"
 readme = "README.md"
@@ -21,3 +21,13 @@ dev = [
     "pytest>=8.0.0",
     "ruff>=0.15.8",
 ]
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["Filtflow"]
