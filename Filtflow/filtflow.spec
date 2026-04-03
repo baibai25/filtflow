@@ -9,6 +9,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('assets/icon.png', 'assets'),
+        ('../LICENSE', '.'),
     ],
     hiddenimports=[
         'sounddevice',
