@@ -124,10 +124,10 @@ BLOCK_SIZE_OPTIONS: list[str] = ["128", "256", "480", "512", "960", "1024"]
 GITHUB_URL: str = "https://github.com/baibai25/filtflow"
 
 try:
-    APP_VERSION: str = version("filtflow")
+    from _version import __version__ as APP_VERSION
 except Exception:
     try:
-        from _version import __version__ as APP_VERSION
+        APP_VERSION = version("filtflow")
     except Exception:
         APP_VERSION = ""
 
