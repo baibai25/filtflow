@@ -19,6 +19,7 @@ dev = [
     "pyinstaller>=6.19.0",
     "pytest>=8.0.0",
     "ruff>=0.15.8",
+    "setuptools-scm>=8.0",
 ]
 
 [build-system]
@@ -27,6 +28,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.version]
 source = "vcs"
+
+[tool.hatch.version.raw-options]
+version_scheme = "guess-next-dev"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "Filtflow/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["Filtflow"]

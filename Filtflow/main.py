@@ -45,6 +45,7 @@ class _AppState:
     quitting: bool = False
     reconnecting: bool = False
     stream_error: str | None = None
+    pending_update: tuple[str, str] | None = None  # (latest_version, url)
 
 
 def _build_filter_chain(
@@ -122,6 +123,9 @@ def main() -> None:
         settings_win.show()
         settings_win.raise_()
         settings_win.activateWindow()
+        # 未表示のアップデート通知があれば表示する
+        if state.pending_update is not None:
+            settings_win.show_update(*state.pending_update)
         # 未解決のストリームエラーがあれば UI にも表示する
         if state.stream_error is not None:
             settings_win.show_error(state.stream_error)
@@ -176,6 +180,7 @@ def main() -> None:
     update_checker = UpdateChecker()
 
     def _on_update_available(latest: str, url: str) -> None:
+        state.pending_update = (latest, url)
         if settings_win is not None:
             settings_win.show_update(latest, url)
 

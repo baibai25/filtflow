@@ -15,9 +15,7 @@ from typing import Any
 from packaging.version import InvalidVersion, Version
 from PySide6.QtCore import QObject, Signal
 
-GITHUB_API_URL: str = (
-    "https://api.github.com/repos/baibai25/filtflow/releases/latest"
-)
+GITHUB_API_URL: str = "https://api.github.com/repos/baibai25/filtflow/releases/latest"
 
 # API リクエストのタイムアウト (秒)
 REQUEST_TIMEOUT: int = 5

@@ -126,7 +126,10 @@ GITHUB_URL: str = "https://github.com/baibai25/filtflow"
 try:
     APP_VERSION: str = version("filtflow")
 except Exception:
-    APP_VERSION = ""
+    try:
+        from _version import __version__ as APP_VERSION
+    except Exception:
+        APP_VERSION = ""
 
 # フィルタ名ラベルの無効時スタイル
 _FILTER_DISABLED_STYLE: str = "color: palette(mid); text-decoration: line-through;"
@@ -961,9 +964,7 @@ class SettingsWindow(QWidget):
         self._version_link.setStyleSheet(
             "color: palette(link); text-decoration: underline; padding: 0;"
         )
-        self._version_link.clicked.connect(
-            lambda: QDesktopServices.openUrl(QUrl(GITHUB_URL))
-        )
+        self._version_link.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(GITHUB_URL)))
         footer_layout.addWidget(self._version_link)
         main_layout.addWidget(footer)
 
@@ -994,13 +995,9 @@ class SettingsWindow(QWidget):
 
     def show_update(self, latest_version: str, release_url: str) -> None:
         """新しいバージョンが利用可能であることをフッターに表示する。"""
-        self._version_link.setText(
-            f"Filtflow ({APP_VERSION}) — v{latest_version} available"
-        )
+        self._version_link.setText(f"Filtflow ({APP_VERSION}) — v{latest_version} available")
         self._version_link.clicked.disconnect()
-        self._version_link.clicked.connect(
-            lambda: QDesktopServices.openUrl(QUrl(release_url))
-        )
+        self._version_link.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(release_url)))
 
     # --- イベントハンドラ ---
 
