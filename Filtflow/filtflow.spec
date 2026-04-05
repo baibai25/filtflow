@@ -14,10 +14,6 @@ a = Analysis(
     hiddenimports=[
         'sounddevice',
         'numpy',
-        'pystray',
-        'PIL',
-        'PIL.Image',
-        'PIL.ImageDraw',
         'PySide6',
         'PySide6.QtCore',
         'PySide6.QtGui',

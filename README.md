@@ -70,7 +70,7 @@ Filtflow/
 ├── expander.py          エキスパンダーフィルタ（OBS 準拠）
 ├── config.py            設定値の定義・ロード・保存
 ├── ui.py                設定 UI（PySide6）
-├── tray.py              タスクトレイ常駐（pystray）
+├── tray.py              タスクトレイ常駐（QSystemTrayIcon）
 ├── filtflow.spec        PyInstaller ビルド設定
 └── assets/
     ├── create_icons.py  icon.png / icon.ico 生成スクリプト

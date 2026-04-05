@@ -68,7 +68,7 @@ Filtflow/
 ├── expander.py          Expander filter (OBS-based)
 ├── config.py            Settings definition / load / save
 ├── ui.py                Settings UI (PySide6)
-├── tray.py              System tray (pystray)
+├── tray.py              System tray (QSystemTrayIcon)
 ├── filtflow.spec        PyInstaller build config
 └── assets/
     ├── create_icons.py  Icon generation script (icon.png / icon.ico)

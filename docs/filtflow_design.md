@@ -401,8 +401,6 @@ EXP_DEFAULT_AUDIO_BUF_MS = 10   # RMSウィンドウ幅（10ms）
 ```
 sounddevice   # WASAPIオーディオI/O
 numpy         # 信号処理
-pystray       # タスクトレイ常駐
-Pillow        # トレイアイコン
 tkinter       # 設定UI（Python標準ライブラリ・追加インストール不要）
 pyinstaller   # exeビルド用（開発時のみ）
 ```
@@ -464,8 +462,6 @@ a = Analysis(
     hiddenimports=[
         'sounddevice',
         'numpy',
-        'pystray',
-        'PIL',
     ],
     hookspath=[],
     cipher=block_cipher,

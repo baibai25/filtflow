@@ -4,12 +4,11 @@
 1. Config をロード
 2. Compressor / Expander を初期化
 3. AudioStream を構築して開始
-4. pystray トレイアイコンをデーモンスレッドで起動
+4. QSystemTrayIcon を表示
 5. QApplication のイベントループをメインスレッドで実行
 
 終了フロー:
-- トレイ「Quit」 → _AppBridge.quit_requested シグナル（QueuedConnection）
-  → _do_quit() → stream.stop() → app.quit()
+- トレイ「Quit」 → _do_quit() → stream.stop() → app.quit()
 """
 
 from __future__ import annotations
@@ -25,7 +24,7 @@ from audio_stream import AudioStream, find_device_index
 from compressor import Compressor
 from config import Config
 from expander import Expander
-from PySide6.QtCore import QObject, Qt, QTimer, Signal
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from tray import TrayIcon
@@ -45,17 +44,6 @@ class _AppState:
     quitting: bool = False
     reconnecting: bool = False
     stream_error: str | None = None
-
-
-class _AppBridge(QObject):
-    """トレイスレッドからメインスレッドへのスレッドセーフなシグナル橋渡し。
-
-    pystray はデーモンスレッドで動くため、UI 操作は QueuedConnection 経由で
-    メインスレッドに委譲する。
-    """
-
-    open_settings_requested = Signal()
-    quit_requested = Signal()
 
 
 def _build_filter_chain(
@@ -116,9 +104,6 @@ def main() -> None:
         level_queue=level_queue,
     )
 
-    # --- シグナルブリッジ（トレイスレッド → メインスレッド） ---
-    bridge = _AppBridge()
-
     settings_win: SettingsWindow | None = None
     tray: TrayIcon | None = None
     state = _AppState()
@@ -146,18 +131,6 @@ def main() -> None:
         state.quitting = True
         stream.stop()
         app.quit()
-
-    # QueuedConnection で確実にメインスレッドで実行させる
-    bridge.open_settings_requested.connect(_show_settings, Qt.ConnectionType.QueuedConnection)
-    bridge.quit_requested.connect(_do_quit, Qt.ConnectionType.QueuedConnection)
-
-    def open_settings() -> None:
-        """トレイから設定ウィンドウを開く。スレッドセーフ。"""
-        bridge.open_settings_requested.emit()
-
-    def quit_app() -> None:
-        """アプリケーション終了。スレッドセーフ。"""
-        bridge.quit_requested.emit()
 
     # --- ストリーム開始・再接続 ---
     def _start_stream() -> None:
@@ -199,8 +172,8 @@ def main() -> None:
         QTimer.singleShot(RECONNECT_INTERVAL_MS, _watch_stream)
 
     # --- トレイアイコン起動 ---
-    tray = TrayIcon(on_open_settings=open_settings, on_quit=quit_app)
-    tray.run_detached()
+    tray = TrayIcon(on_open_settings=_show_settings, on_quit=_do_quit)
+    tray.show()
 
     # ストリーム開始（after でイベントループを先に立ち上げてから非同期に開始）
     QTimer.singleShot(100, _start_stream)
