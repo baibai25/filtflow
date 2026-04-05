@@ -6,7 +6,7 @@ license = "GPL-2.0-or-later"
 readme = "README.md"
 requires-python = ">=3.13.5"
 dependencies = [
-    "pyside6>=6.7.0",
+    "pyside6-essentials>=6.7.0",
     "pyqtdarktheme>=2.1.0",
     "numpy>=2.4.4",
     "sounddevice>=0.5.5",
