@@ -6,7 +6,8 @@ $ErrorActionPreference = "Stop"
 
 $DistDir  = "Filtflow\dist"
 $BuildDir = "Filtflow\build"
-$ZipName  = "Filtflow.zip"
+$Version  = (uv run python -c "from setuptools_scm import get_version; print(get_version())").Trim()
+$ZipName  = "Filtflow_v${Version}.zip"
 $StageDir = "_staging\Filtflow"
 
 # 1. _version.py 生成 (setuptools-scm: git タグからバージョンを取得)

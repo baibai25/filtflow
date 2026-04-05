@@ -21,9 +21,11 @@ Filtflow routes filtered audio to communication apps (Discord, Teams, etc.) thro
 
 ### 2. Install Filtflow
 
-1. Download the latest zip from [GitHub Releases](https://github.com/baibai25/filtflow/releases)
+1. Download the latest `Filtflow_v*.zip` from [GitHub Releases](https://github.com/baibai25/filtflow/releases)
 2. Extract the zip to any folder
 3. Run `Filtflow.exe`
+
+> **Note:** The extracted folder contains a `source/` folder (source code), which can be safely deleted. Only `Filtflow.exe` is required to run the application.
 
 ## Usage
 
