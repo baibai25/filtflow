@@ -23,9 +23,11 @@ Filtflow はフィルタ処理した音声を仮想オーディオデバイス�
 
 ### 2. Filtflow のインストール
 
-1. [GitHub Releases](https://github.com/baibai25/filtflow/releases) から最新の zip をダウンロードします
+1. [GitHub Releases](https://github.com/baibai25/filtflow/releases) から最新の `Filtflow_v*.zip` をダウンロードします
 2. zip を任意のフォルダに展開します
 3. `Filtflow.exe` を実行します
+
+> **Note:** 展開後のフォルダには `source/` フォルダ（ソースコード）も含まれていますが、削除しても動作に影響ありません。実行に必要なのは `Filtflow.exe` のみです。
 
 ## 使い方
 
