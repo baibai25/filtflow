@@ -28,7 +28,8 @@ from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from tray import TrayIcon
-from ui import SettingsWindow, apply_appearance_mode
+from ui import APP_VERSION, SettingsWindow, apply_appearance_mode
+from update_checker import UpdateChecker
 
 # レベルメーターキューの最大サイズ
 LEVEL_QUEUE_MAXSIZE: int = 16
@@ -170,6 +171,17 @@ def main() -> None:
         if not stream.is_active and not state.reconnecting:
             _start_stream()
         QTimer.singleShot(RECONNECT_INTERVAL_MS, _watch_stream)
+
+    # --- 更新チェック（起動時に1回、バックグラウンドで実行） ---
+    update_checker = UpdateChecker()
+
+    def _on_update_available(latest: str, url: str) -> None:
+        if settings_win is not None:
+            settings_win.show_update(latest, url)
+
+    update_checker.update_available.connect(_on_update_available)
+    if APP_VERSION:
+        update_checker.check(APP_VERSION)
 
     # --- トレイアイコン起動 ---
     tray = TrayIcon(on_open_settings=_show_settings, on_quit=_do_quit)
