@@ -1,12 +1,17 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 Kotaro Ambai (baibai25)
+#
+# Python re-implementation of the compressor filter algorithm from
+# OBS Studio (plugins/obs-filters/compressor-filter.c),
+# originally licensed under GPL-2.0-or-later.
+#
+# Modified by Kotaro Ambai (baibai25) in April 2026.
+# See the LICENSE file in this repository for the full license text.
+
 """コンプレッサーフィルタ
 
 OBS Studio の plugins/obs-filters/compressor-filter.c に準拠したアルゴリズム。
 参照箇所: compressor_defaults(), analyze_envelope(), process_compression()
-
-Based on OBS Studio - plugins/obs-filters/compressor-filter.c
-Copyright (C) OBS Project contributors
-Licensed under the GNU General Public License v2 (GPL-2.0)
-https://github.com/obsproject/obs-studio
 """
 
 from __future__ import annotations

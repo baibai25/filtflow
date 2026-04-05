@@ -126,7 +126,7 @@ GITHUB_URL: str = "https://github.com/baibai25/filtflow"
 try:
     APP_VERSION: str = version("filtflow")
 except Exception:
-    APP_VERSION = "unknown"
+    APP_VERSION = ""
 
 # フィルタ名ラベルの無効時スタイル
 _FILTER_DISABLED_STYLE: str = "color: palette(mid); text-decoration: line-through;"
@@ -955,12 +955,10 @@ class SettingsWindow(QWidget):
         footer_layout = QHBoxLayout(footer)
         footer_layout.setContentsMargins(4, 0, 4, 0)
         footer_layout.addStretch()
-        version_link = QPushButton(f"Filtflow v{APP_VERSION}")
+        version_link = QPushButton(f"Filtflow ({APP_VERSION})")
         version_link.setFlat(True)
         version_link.setCursor(Qt.CursorShape.PointingHandCursor)
-        version_link.setStyleSheet(
-            "color: palette(link); text-decoration: underline; padding: 0;"
-        )
+        version_link.setStyleSheet("color: palette(link); text-decoration: underline; padding: 0;")
         version_link.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(GITHUB_URL)))
         footer_layout.addWidget(version_link)
         main_layout.addWidget(footer)
