@@ -5,7 +5,7 @@ OBS Studio の plugins/obs-filters/expander-filter.c に準拠したアルゴリ
 
 Based on OBS Studio - plugins/obs-filters/expander-filter.c
 Copyright (C) OBS Project contributors
-Licensed under the GNU General Public License v2 (GPLv2)
+Licensed under the GNU General Public License v2 (GPL-2.0)
 https://github.com/obsproject/obs-studio
 """
 
