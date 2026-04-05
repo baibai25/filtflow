@@ -1,22 +1,32 @@
 [project]
 name = "filtflow"
-version = "0.1.0"
-description = "Add your description here"
+dynamic = ["version"]
+description = "Real-time audio filter for Windows microphone input via WASAPI"
+license = "GPL-2.0-or-later"
 readme = "README.md"
 requires-python = ">=3.13.5"
 dependencies = [
-    "pyside6>=6.7.0",
+    "pyside6-essentials>=6.7.0",
     "pyqtdarktheme>=2.1.0",
     "numpy>=2.4.4",
-    "pillow>=12.1.1",
-    "pystray>=0.19.5",
     "sounddevice>=0.5.5",
 ]
 
 [dependency-groups]
 dev = [
     "mypy>=1.19.1",
+    "pillow>=12.1.1",
     "pyinstaller>=6.19.0",
     "pytest>=8.0.0",
     "ruff>=0.15.8",
 ]
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["Filtflow"]

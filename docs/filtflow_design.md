@@ -8,7 +8,7 @@
 Windows上の全アプリケーションに対してフィルタ済み音声を提供する常駐ツール。
 
 フィルタのアルゴリズムおよびパラメータはすべて
-**OBS Studio のソースコード（MITライセンス）に完全準拠**する。
+**OBS Studio のソースコード（GPL-2.0 ライセンス）に準拠**する。
 
 - compressor: `plugins/obs-filters/compressor-filter.c`
 - expander:   `plugins/obs-filters/expander-filter.c`
@@ -52,10 +52,10 @@ Discord / OBS / ブラウザ / その他すべて
 OBSのベストプラクティスに準拠し、以下の順で適用する：
 
 ```
-入力 → [Compressor] → [Expander] → 出力
+入力 → [Expander] → [Compressor] → 出力
 ```
 
-コンプレッサーで音量の突出を抑えてからエキスパンダーで無音部分を削ることで、
+エキスパンダーで無音部分を削ってからコンプレッサーで音量の突出を抑えることで、
 ゲインの暴れを最小化する。
 
 ### 2.3 モジュール構成
@@ -194,7 +194,7 @@ class Expander:
 **責務**
 
 - sounddevice を使ったWASAPIストリームの開通
-- コールバック経由でフィルタチェーン（Compressor → Expander）を呼び出す
+- コールバック経由でフィルタチェーン（Expander → Compressor）を呼び出す
 - デバイス一覧の列挙とインデックス特定
 
 **パラメータ**
@@ -401,8 +401,6 @@ EXP_DEFAULT_AUDIO_BUF_MS = 10   # RMSウィンドウ幅（10ms）
 ```
 sounddevice   # WASAPIオーディオI/O
 numpy         # 信号処理
-pystray       # タスクトレイ常駐
-Pillow        # トレイアイコン
 tkinter       # 設定UI（Python標準ライブラリ・追加インストール不要）
 pyinstaller   # exeビルド用（開発時のみ）
 ```
@@ -464,8 +462,6 @@ a = Analysis(
     hiddenimports=[
         'sounddevice',
         'numpy',
-        'pystray',
-        'PIL',
     ],
     hookspath=[],
     cipher=block_cipher,

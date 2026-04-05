@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(uv remove:*)",
-      "Bash(python Filtflow/assets/create_icons.py)"
+      "Bash(python Filtflow/assets/create_icons.py)",
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

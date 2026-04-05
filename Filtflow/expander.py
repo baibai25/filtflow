@@ -1,6 +1,16 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 Kotaro Ambai (baibai25)
+#
+# Python re-implementation of the expander filter algorithm from
+# OBS Studio (plugins/obs-filters/expander-filter.c),
+# originally licensed under GPL-2.0-or-later.
+#
+# Modified by Kotaro Ambai (baibai25) in April 2026.
+# See the LICENSE file in this repository for the full license text.
+
 """エキスパンダーフィルタ（ノイズゲートを含む）
 
-OBS Studio の plugins/obs-filters/expander-filter.c に完全準拠したアルゴリズム。
+OBS Studio の plugins/obs-filters/expander-filter.c に準拠したアルゴリズム。
 参照箇所: expander_defaults(), analyze_envelope(), process_sample(), process_expansion()
 """
 

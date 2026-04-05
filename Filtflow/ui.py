@@ -8,6 +8,7 @@ DPI スケーリングは PySide6 が自動処理するため、手動スケー�
 from __future__ import annotations
 
 import queue
+from importlib.metadata import version
 from typing import Callable
 
 import qdarktheme
@@ -63,12 +64,14 @@ from PySide6.QtCore import (
     QSize,
     Qt,
     QTimer,
+    QUrl,
     Signal,
 )
 from PySide6.QtGui import (
     QBrush,
     QCloseEvent,
     QColor,
+    QDesktopServices,
     QFont,
     QFontMetrics,
     QMouseEvent,
@@ -117,6 +120,13 @@ METER_SCALE_HEIGHT: int = 18
 METER_TICK_MARKS: list[float] = [-60.0, -50.0, -40.0, -30.0, -20.0, -10.0, 0.0]
 
 BLOCK_SIZE_OPTIONS: list[str] = ["128", "256", "480", "512", "960", "1024"]
+
+GITHUB_URL: str = "https://github.com/baibai25/filtflow"
+
+try:
+    APP_VERSION: str = version("filtflow")
+except Exception:
+    APP_VERSION = ""
 
 # フィルタ名ラベルの無効時スタイル
 _FILTER_DISABLED_STYLE: str = "color: palette(mid); text-decoration: line-through;"
@@ -939,6 +949,19 @@ class SettingsWindow(QWidget):
         # currentRow が既に 0 の場合に currentRowChanged が発火しない。
         self._filter_stack.setCurrentIndex(0)
         self._filter_list.setCurrentRow(0)
+
+        # --- フッター: バージョン（GitHub リンク付き）右寄せ ---
+        footer = QWidget()
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(4, 0, 4, 0)
+        footer_layout.addStretch()
+        version_link = QPushButton(f"Filtflow ({APP_VERSION})")
+        version_link.setFlat(True)
+        version_link.setCursor(Qt.CursorShape.PointingHandCursor)
+        version_link.setStyleSheet("color: palette(link); text-decoration: underline; padding: 0;")
+        version_link.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(GITHUB_URL)))
+        footer_layout.addWidget(version_link)
+        main_layout.addWidget(footer)
 
     @staticmethod
     def _refresh_combo(combo: QComboBox, items: list[str], current: str) -> None:

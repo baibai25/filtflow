@@ -4,18 +4,18 @@
 1. Config をロード
 2. Compressor / Expander を初期化
 3. AudioStream を構築して開始
-4. pystray トレイアイコンをデーモンスレッドで起動
+4. QSystemTrayIcon を表示
 5. QApplication のイベントループをメインスレッドで実行
 
 終了フロー:
-- トレイ「終了」 → _AppBridge.quit_requested シグナル（QueuedConnection）
-  → _do_quit() → stream.stop() → app.quit()
+- トレイ「Quit」 → _do_quit() → stream.stop() → app.quit()
 """
 
 from __future__ import annotations
 
 import queue
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
@@ -24,7 +24,7 @@ from audio_stream import AudioStream, find_device_index
 from compressor import Compressor
 from config import Config
 from expander import Expander
-from PySide6.QtCore import QObject, Qt, QTimer, Signal
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from tray import TrayIcon
@@ -37,15 +37,13 @@ LEVEL_QUEUE_MAXSIZE: int = 16
 RECONNECT_INTERVAL_MS: int = 3000
 
 
-class _AppBridge(QObject):
-    """トレイスレッドからメインスレッドへのスレッドセーフなシグナル橋渡し。
+@dataclass
+class _AppState:
+    """main() 内のクロージャ間で共有する可変状態。"""
 
-    pystray はデーモンスレッドで動くため、UI 操作は QueuedConnection 経由で
-    メインスレッドに委譲する。
-    """
-
-    open_settings_requested = Signal()
-    quit_requested = Signal()
+    quitting: bool = False
+    reconnecting: bool = False
+    stream_error: str | None = None
 
 
 def _build_filter_chain(
@@ -106,16 +104,9 @@ def main() -> None:
         level_queue=level_queue,
     )
 
-    # --- シグナルブリッジ（トレイスレッド → メインスレッド） ---
-    bridge = _AppBridge()
-
     settings_win: SettingsWindow | None = None
     tray: TrayIcon | None = None
-
-    # 終了フラグ・再接続中フラグ・エラーメッセージ（list で可変にして内側関数から参照する）
-    _quitting: list[bool] = [False]
-    _reconnecting: list[bool] = [False]  # 再試行タイマーがすでにキューにあるか
-    _stream_error: list[str | None] = [None]  # 最新のストリームエラーメッセージ
+    state = _AppState()
 
     def _show_settings() -> None:
         nonlocal settings_win
@@ -131,27 +122,15 @@ def main() -> None:
         settings_win.raise_()
         settings_win.activateWindow()
         # 未解決のストリームエラーがあれば UI にも表示する
-        if _stream_error[0] is not None:
-            settings_win.show_error(_stream_error[0])
+        if state.stream_error is not None:
+            settings_win.show_error(state.stream_error)
         else:
             settings_win.clear_error()
 
     def _do_quit() -> None:
-        _quitting[0] = True
+        state.quitting = True
         stream.stop()
         app.quit()
-
-    # QueuedConnection で確実にメインスレッドで実行させる
-    bridge.open_settings_requested.connect(_show_settings, Qt.ConnectionType.QueuedConnection)
-    bridge.quit_requested.connect(_do_quit, Qt.ConnectionType.QueuedConnection)
-
-    def open_settings() -> None:
-        """トレイから設定ウィンドウを開く。スレッドセーフ。"""
-        bridge.open_settings_requested.emit()
-
-    def quit_app() -> None:
-        """アプリケーション終了。スレッドセーフ。"""
-        bridge.quit_requested.emit()
 
     # --- ストリーム開始・再接続 ---
     def _start_stream() -> None:
@@ -159,13 +138,13 @@ def main() -> None:
 
         _reconnecting フラグで再試行タイマーを 1 本に限定し多重スタックを防ぐ。
         """
-        if _quitting[0]:
+        if state.quitting:
             return
-        _reconnecting[0] = True
+        state.reconnecting = True
         try:
             stream.restart()
-            _reconnecting[0] = False
-            _stream_error[0] = None
+            state.reconnecting = False
+            state.stream_error = None
             if tray is not None:
                 tray.set_normal_state()
             if settings_win is not None:
@@ -173,12 +152,12 @@ def main() -> None:
         except Exception as exc:
             msg = str(exc)
             print(f"[Filtflow] AudioStream エラー: {msg}", file=sys.stderr)
-            _stream_error[0] = msg
+            state.stream_error = msg
             if tray is not None:
                 tray.set_error_state()
             if settings_win is not None:
                 settings_win.show_error(msg)
-            # _reconnecting[0] は True のまま保持し、次の試行が終わるまでスキップさせる
+            # state.reconnecting は True のまま保持し、次の試行が終わるまでスキップさせる
             QTimer.singleShot(RECONNECT_INTERVAL_MS, _start_stream)
 
     def _watch_stream() -> None:
@@ -186,15 +165,15 @@ def main() -> None:
 
         _reconnecting が True の間はスキップして再試行タイマーの多重スタックを防ぐ。
         """
-        if _quitting[0]:
+        if state.quitting:
             return
-        if not stream.is_active and not _reconnecting[0]:
+        if not stream.is_active and not state.reconnecting:
             _start_stream()
         QTimer.singleShot(RECONNECT_INTERVAL_MS, _watch_stream)
 
     # --- トレイアイコン起動 ---
-    tray = TrayIcon(on_open_settings=open_settings, on_quit=quit_app)
-    tray.run_detached()
+    tray = TrayIcon(on_open_settings=_show_settings, on_quit=_do_quit)
+    tray.show()
 
     # ストリーム開始（after でイベントループを先に立ち上げてから非同期に開始）
     QTimer.singleShot(100, _start_stream)
