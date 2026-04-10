@@ -4,8 +4,6 @@ A resident tool that applies an expander and compressor in real time to any micr
 
 Filter algorithms are **derived from OBS Studio audio filter functionality (GPL-2.0)**.
 
-## Screenshots
-
 | Dark | Light |
 |:----:|:-----:|
 | ![Dark Theme](images/screenshot_dark.png) | ![Light Theme](images/screenshot_light.png) |

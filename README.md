@@ -4,8 +4,6 @@
 
 任意のマイク入力にエキスパンダーとコンプレッサーをリアルタイム適用し、Windows 上の全アプリケーションにフィルタ済み音声を提供する常駐ツールです。
 
-## スクリーンショット
-
 | Dark | Light |
 |:----:|:-----:|
 | ![Dark Theme](docs/images/screenshot_dark.png) | ![Light Theme](docs/images/screenshot_light.png) |
