@@ -1,12 +1,21 @@
 # Filtflow
 
-A resident tool that applies an expander and compressor in real time to any microphone input, delivering filtered audio to all applications on Windows.
+A Windows system-tray tool that applies an **expander (noise gate) and compressor** in real time to any microphone input, delivering filtered audio to all applications. Get clear, professional-quality mic audio for Discord, Teams, Zoom, and any other communication app — no OBS required.
 
 Filter algorithms are **derived from OBS Studio audio filter functionality (GPL-2.0)**.
 
 | Dark | Light |
 |:----:|:-----:|
 | ![Dark Theme](images/screenshot_dark.png) | ![Light Theme](images/screenshot_light.png) |
+
+## Features
+
+- **Real-time audio filtering** — Low-latency microphone processing via WASAPI
+- **Expander / Noise Gate** — Automatically suppress background noise, keyboard clicks, and ambient sound
+- **Compressor** — Even out volume dynamics for consistent, clear voice quality
+- **System tray resident** — Runs silently in the background; adjust settings from the notification area
+- **Works with any app** — Routes filtered audio through VB-Cable to Discord, Teams, Zoom, OBS, and more
+- **OBS-compatible parameters** — Familiar settings for anyone already using OBS Studio audio filters
 
 ## Requirements
 
