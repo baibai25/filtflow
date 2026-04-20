@@ -1,0 +1,39 @@
+name: Validate PR to main - must be releases/* branched from develop
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate-releases-branch-from-develop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify source is releases/* branched from develop
+        run: |
+          SOURCE_BRANCH="${{ github.head_ref }}"
+
+          # Check if source branch matches releases/*
+          if [[ "$SOURCE_BRANCH" != releases/* ]]; then
+            echo "❌ PRs to main are only allowed from releases/* branches"
+            echo "   Current branch: $SOURCE_BRANCH"
+            exit 1
+          fi
+
+          # Check if the release branch was cut from develop
+          MERGE_BASE=$(git merge-base origin/develop origin/"$SOURCE_BRANCH")
+          DEVELOP_TIP=$(git rev-parse origin/develop)
+
+          if [[ "$MERGE_BASE" != "$DEVELOP_TIP" ]]; then
+            echo "❌ '$SOURCE_BRANCH' must be branched from the tip of develop"
+            echo "   develop tip:  $DEVELOP_TIP"
+            echo "   merge-base:   $MERGE_BASE"
+            exit 1
+          fi
+
+          echo "✅ Source branch check passed: $SOURCE_BRANCH (branched from develop)"
