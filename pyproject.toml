@@ -2,6 +2,22 @@
 name = "filtflow"
 dynamic = ["version"]
 description = "Real-time audio filter for Windows microphone input via WASAPI"
+keywords = [
+    "audio",
+    "microphone",
+    "compressor",
+    "expander",
+    "noise-gate",
+    "audio-filter",
+    "real-time-audio",
+    "wasapi",
+    "windows",
+    "discord",
+    "obs",
+    "pyside6",
+    "system-tray",
+    "voice-processing",
+]
 license = "GPL-2.0-or-later"
 readme = "README.md"
 requires-python = ">=3.13.5"
