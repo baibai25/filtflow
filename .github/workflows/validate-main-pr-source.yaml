@@ -1,12 +1,15 @@
 name: Validate PR to main - must be releases/* branched from develop
 
+# The job is required by the "main/dev" ruleset on both main and develop, so the
+# workflow must trigger on every PR: with a branches filter it would never report
+# a status on PRs to develop, leaving them stuck on "Expected". The job-level `if`
+# skips the check for non-main PRs, and skipped jobs satisfy required checks.
 on:
   pull_request:
-    branches:
-      - main
 
 jobs:
   validate-releases-branch-from-develop:
+    if: github.base_ref == 'main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
