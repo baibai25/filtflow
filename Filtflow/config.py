@@ -110,7 +110,8 @@ def _as_float(value: Any, default: float) -> float:
     """value を float に変換する。変換不能・非有限値（NaN/Inf）は default を返す。"""
     try:
         result = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
+        # OverflowError: float に収まらない巨大な int
         return default
     if not math.isfinite(result):
         return default

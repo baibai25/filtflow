@@ -196,6 +196,14 @@ class TestConfigValidation:
         assert cfg.sample_rate == 8000  # MIN_SAMPLE_RATE
         assert cfg.block_size == 32  # MIN_BLOCK_SIZE
 
+    def test_huge_int_falls_back_to_default(self, config_paths: Path) -> None:
+        # float に収まらない巨大な整数は OverflowError になるためデフォルトに落とす
+        _write_config(config_paths, {"sample_rate": 10**400, "compressor": {"ratio": 10**400}})
+
+        cfg = Config.load()
+        assert cfg.sample_rate == 48000
+        assert cfg.compressor.ratio == 10.0
+
     def test_nan_and_infinity_fall_back_to_defaults(self, config_paths: Path) -> None:
         # json.load は NaN / Infinity をデフォルトで受理する
         config_paths.write_text(
