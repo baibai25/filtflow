@@ -18,78 +18,12 @@ from pathlib import Path
 from typing import Any, cast
 
 try:
-    from compressor import (
-        COMP_DEFAULT_ATTACK_MS,
-        COMP_DEFAULT_OUTPUT_GAIN_DB,
-        COMP_DEFAULT_RATIO,
-        COMP_DEFAULT_RELEASE_MS,
-        COMP_DEFAULT_THRESHOLD_DB,
-        COMP_MAX_ATK_MS,
-        COMP_MAX_OUTPUT_GAIN,
-        COMP_MAX_RATIO,
-        COMP_MAX_RLS_MS,
-        COMP_MAX_THRESHOLD_DB,
-        COMP_MIN_ATK_RLS_MS,
-        COMP_MIN_OUTPUT_GAIN,
-        COMP_MIN_RATIO,
-        COMP_MIN_THRESHOLD_DB,
-    )
-    from expander import (
-        DETECTOR_PEAK,
-        DETECTOR_RMS,
-        EXP_DEFAULT_ATTACK_MS,
-        EXP_DEFAULT_OUTPUT_GAIN_DB,
-        EXP_DEFAULT_RATIO,
-        EXP_DEFAULT_RELEASE_MS,
-        EXP_DEFAULT_THRESHOLD_DB,
-        EXP_MAX_ATK_MS,
-        EXP_MAX_OUTPUT_GAIN,
-        EXP_MAX_RATIO,
-        EXP_MAX_RLS_MS,
-        EXP_MAX_THRESHOLD_DB,
-        EXP_MIN_ATK_RLS_MS,
-        EXP_MIN_OUTPUT_GAIN,
-        EXP_MIN_RATIO,
-        EXP_MIN_THRESHOLD_DB,
-        PRESET_EXPANDER,
-        PRESET_GATE,
-    )
+    import compressor
+    import expander
 except ImportError:  # pytest などからパッケージとしてインポートされる場合
-    from Filtflow.compressor import (  # type: ignore[no-redef]
-        COMP_DEFAULT_ATTACK_MS,
-        COMP_DEFAULT_OUTPUT_GAIN_DB,
-        COMP_DEFAULT_RATIO,
-        COMP_DEFAULT_RELEASE_MS,
-        COMP_DEFAULT_THRESHOLD_DB,
-        COMP_MAX_ATK_MS,
-        COMP_MAX_OUTPUT_GAIN,
-        COMP_MAX_RATIO,
-        COMP_MAX_RLS_MS,
-        COMP_MAX_THRESHOLD_DB,
-        COMP_MIN_ATK_RLS_MS,
-        COMP_MIN_OUTPUT_GAIN,
-        COMP_MIN_RATIO,
-        COMP_MIN_THRESHOLD_DB,
-    )
-    from Filtflow.expander import (  # type: ignore[no-redef]
-        DETECTOR_PEAK,
-        DETECTOR_RMS,
-        EXP_DEFAULT_ATTACK_MS,
-        EXP_DEFAULT_OUTPUT_GAIN_DB,
-        EXP_DEFAULT_RATIO,
-        EXP_DEFAULT_RELEASE_MS,
-        EXP_DEFAULT_THRESHOLD_DB,
-        EXP_MAX_ATK_MS,
-        EXP_MAX_OUTPUT_GAIN,
-        EXP_MAX_RATIO,
-        EXP_MAX_RLS_MS,
-        EXP_MAX_THRESHOLD_DB,
-        EXP_MIN_ATK_RLS_MS,
-        EXP_MIN_OUTPUT_GAIN,
-        EXP_MIN_RATIO,
-        EXP_MIN_THRESHOLD_DB,
-        PRESET_EXPANDER,
-        PRESET_GATE,
+    from Filtflow import (
+        compressor,  # type: ignore[no-redef]
+        expander,  # type: ignore[no-redef]
     )
 
 CONFIG_DIR: Path = Path(os.environ.get("APPDATA", str(Path.home()))) / "Filtflow"
@@ -150,23 +84,23 @@ def _backup_broken_config() -> None:
 @dataclass
 class CompressorConfig:
     enabled: bool = True
-    ratio: float = COMP_DEFAULT_RATIO
-    threshold_db: float = COMP_DEFAULT_THRESHOLD_DB
-    attack_ms: int = COMP_DEFAULT_ATTACK_MS
-    release_ms: int = COMP_DEFAULT_RELEASE_MS
-    output_gain_db: float = COMP_DEFAULT_OUTPUT_GAIN_DB
+    ratio: float = compressor.COMP_DEFAULT_RATIO
+    threshold_db: float = compressor.COMP_DEFAULT_THRESHOLD_DB
+    attack_ms: int = compressor.COMP_DEFAULT_ATTACK_MS
+    release_ms: int = compressor.COMP_DEFAULT_RELEASE_MS
+    output_gain_db: float = compressor.COMP_DEFAULT_OUTPUT_GAIN_DB
 
 
 @dataclass
 class ExpanderConfig:
     enabled: bool = True
-    preset: str = PRESET_EXPANDER
-    ratio: float = EXP_DEFAULT_RATIO
-    threshold_db: float = EXP_DEFAULT_THRESHOLD_DB
-    attack_ms: int = EXP_DEFAULT_ATTACK_MS
-    release_ms: int = EXP_DEFAULT_RELEASE_MS
-    output_gain_db: float = EXP_DEFAULT_OUTPUT_GAIN_DB
-    detector: str = DETECTOR_RMS
+    preset: str = expander.PRESET_EXPANDER
+    ratio: float = expander.EXP_DEFAULT_RATIO
+    threshold_db: float = expander.EXP_DEFAULT_THRESHOLD_DB
+    attack_ms: int = expander.EXP_DEFAULT_ATTACK_MS
+    release_ms: int = expander.EXP_DEFAULT_RELEASE_MS
+    output_gain_db: float = expander.EXP_DEFAULT_OUTPUT_GAIN_DB
+    detector: str = expander.DETECTOR_RMS
 
 
 @dataclass
@@ -236,31 +170,34 @@ class Config:
             cfg.compressor = CompressorConfig(
                 enabled=bool(comp.get("enabled", True)),
                 ratio=_clamp_float(
-                    comp.get("ratio"), COMP_DEFAULT_RATIO, COMP_MIN_RATIO, COMP_MAX_RATIO
+                    comp.get("ratio"),
+                    compressor.COMP_DEFAULT_RATIO,
+                    compressor.COMP_MIN_RATIO,
+                    compressor.COMP_MAX_RATIO,
                 ),
                 threshold_db=_clamp_float(
                     comp.get("threshold_db"),
-                    COMP_DEFAULT_THRESHOLD_DB,
-                    COMP_MIN_THRESHOLD_DB,
-                    COMP_MAX_THRESHOLD_DB,
+                    compressor.COMP_DEFAULT_THRESHOLD_DB,
+                    compressor.COMP_MIN_THRESHOLD_DB,
+                    compressor.COMP_MAX_THRESHOLD_DB,
                 ),
                 attack_ms=_clamp_int(
                     comp.get("attack_ms"),
-                    COMP_DEFAULT_ATTACK_MS,
-                    COMP_MIN_ATK_RLS_MS,
-                    COMP_MAX_ATK_MS,
+                    compressor.COMP_DEFAULT_ATTACK_MS,
+                    compressor.COMP_MIN_ATK_RLS_MS,
+                    compressor.COMP_MAX_ATK_MS,
                 ),
                 release_ms=_clamp_int(
                     comp.get("release_ms"),
-                    COMP_DEFAULT_RELEASE_MS,
-                    COMP_MIN_ATK_RLS_MS,
-                    COMP_MAX_RLS_MS,
+                    compressor.COMP_DEFAULT_RELEASE_MS,
+                    compressor.COMP_MIN_ATK_RLS_MS,
+                    compressor.COMP_MAX_RLS_MS,
                 ),
                 output_gain_db=_clamp_float(
                     comp.get("output_gain_db"),
-                    COMP_DEFAULT_OUTPUT_GAIN_DB,
-                    COMP_MIN_OUTPUT_GAIN,
-                    COMP_MAX_OUTPUT_GAIN,
+                    compressor.COMP_DEFAULT_OUTPUT_GAIN_DB,
+                    compressor.COMP_MIN_OUTPUT_GAIN,
+                    compressor.COMP_MAX_OUTPUT_GAIN,
                 ),
             )
 
@@ -269,37 +206,44 @@ class Config:
             cfg.expander = ExpanderConfig(
                 enabled=bool(exp.get("enabled", True)),
                 preset=_as_choice(
-                    exp.get("preset"), PRESET_EXPANDER, (PRESET_EXPANDER, PRESET_GATE)
+                    exp.get("preset"),
+                    expander.PRESET_EXPANDER,
+                    (expander.PRESET_EXPANDER, expander.PRESET_GATE),
                 ),
                 ratio=_clamp_float(
-                    exp.get("ratio"), EXP_DEFAULT_RATIO, EXP_MIN_RATIO, EXP_MAX_RATIO
+                    exp.get("ratio"),
+                    expander.EXP_DEFAULT_RATIO,
+                    expander.EXP_MIN_RATIO,
+                    expander.EXP_MAX_RATIO,
                 ),
                 threshold_db=_clamp_float(
                     exp.get("threshold_db"),
-                    EXP_DEFAULT_THRESHOLD_DB,
-                    EXP_MIN_THRESHOLD_DB,
-                    EXP_MAX_THRESHOLD_DB,
+                    expander.EXP_DEFAULT_THRESHOLD_DB,
+                    expander.EXP_MIN_THRESHOLD_DB,
+                    expander.EXP_MAX_THRESHOLD_DB,
                 ),
                 attack_ms=_clamp_int(
                     exp.get("attack_ms"),
-                    EXP_DEFAULT_ATTACK_MS,
-                    EXP_MIN_ATK_RLS_MS,
-                    EXP_MAX_ATK_MS,
+                    expander.EXP_DEFAULT_ATTACK_MS,
+                    expander.EXP_MIN_ATK_RLS_MS,
+                    expander.EXP_MAX_ATK_MS,
                 ),
                 release_ms=_clamp_int(
                     exp.get("release_ms"),
-                    EXP_DEFAULT_RELEASE_MS,
-                    EXP_MIN_ATK_RLS_MS,
-                    EXP_MAX_RLS_MS,
+                    expander.EXP_DEFAULT_RELEASE_MS,
+                    expander.EXP_MIN_ATK_RLS_MS,
+                    expander.EXP_MAX_RLS_MS,
                 ),
                 output_gain_db=_clamp_float(
                     exp.get("output_gain_db"),
-                    EXP_DEFAULT_OUTPUT_GAIN_DB,
-                    EXP_MIN_OUTPUT_GAIN,
-                    EXP_MAX_OUTPUT_GAIN,
+                    expander.EXP_DEFAULT_OUTPUT_GAIN_DB,
+                    expander.EXP_MIN_OUTPUT_GAIN,
+                    expander.EXP_MAX_OUTPUT_GAIN,
                 ),
                 detector=_as_choice(
-                    exp.get("detector"), DETECTOR_RMS, (DETECTOR_RMS, DETECTOR_PEAK)
+                    exp.get("detector"),
+                    expander.DETECTOR_RMS,
+                    (expander.DETECTOR_RMS, expander.DETECTOR_PEAK),
                 ),
             )
 
