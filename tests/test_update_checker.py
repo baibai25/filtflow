@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from Filtflow.update_checker import (
+    RELEASES_URL,
     UpdateChecker,
+    _build_release_url,
     _fetch_latest_release,
     _parse_version,
 )
@@ -37,6 +37,26 @@ class TestParseVersion:
         assert v1 is not None
         assert v2 is not None
         assert v2 > v1
+
+
+class TestBuildReleaseUrl:
+    def test_valid_tag(self) -> None:
+        assert _build_release_url("v0.2.0") == f"{RELEASES_URL}/tag/v0.2.0"
+
+    def test_tag_with_underscore_and_hyphen(self) -> None:
+        assert _build_release_url("v1.0.0-rc_1") == f"{RELEASES_URL}/tag/v1.0.0-rc_1"
+
+    def test_empty_tag_falls_back(self) -> None:
+        assert _build_release_url("") == RELEASES_URL
+
+    def test_tag_with_slash_falls_back(self) -> None:
+        assert _build_release_url("v0.2.0/../evil") == RELEASES_URL
+
+    def test_tag_with_scheme_falls_back(self) -> None:
+        assert _build_release_url("javascript:alert(1)") == RELEASES_URL
+
+    def test_tag_with_query_falls_back(self) -> None:
+        assert _build_release_url("v0.2.0?x=1") == RELEASES_URL
 
 
 class TestFetchLatestRelease:
@@ -84,7 +104,19 @@ class TestUpdateChecker:
         with patch("Filtflow.update_checker._fetch_latest_release", return_value=fake):
             checker._run("0.1.0")
 
-        callback.assert_called_once_with("0.2.0", "https://example.com/v0.2.0")
+        callback.assert_called_once_with("0.2.0", f"{RELEASES_URL}/tag/v0.2.0")
+
+    def test_release_url_ignores_html_url(self) -> None:
+        """html_url は使わず tag_name から URL を構築する (Issue #19)。"""
+        checker = UpdateChecker()
+        callback = MagicMock()
+        checker.update_available.connect(callback)
+
+        fake = self._make_fake_release("v0.2.0", "file:///C:/Windows/evil.exe")
+        with patch("Filtflow.update_checker._fetch_latest_release", return_value=fake):
+            checker._run("0.1.0")
+
+        callback.assert_called_once_with("0.2.0", f"{RELEASES_URL}/tag/v0.2.0")
 
     def test_no_update_when_current_is_latest(self) -> None:
         checker = UpdateChecker()

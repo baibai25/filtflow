@@ -180,6 +180,8 @@ def main() -> None:
     update_checker = UpdateChecker()
 
     def _on_update_available(latest: str, url: str) -> None:
+        # update_available は UpdateChecker がメインスレッドで発火することを
+        # 保証しているため、クロージャ接続でも GUI 操作は安全
         state.pending_update = (latest, url)
         if settings_win is not None:
             settings_win.show_update(latest, url)
