@@ -92,15 +92,21 @@ _exclude_data_prefixes = (
 
 # imageformats プラグインは使用フォーマットのみ残す
 # PNG は Qt6Gui 組み込みのためプラグイン不要。qsvg は qdarktheme が使用するため除外不可
-_keep_imageformats = {'qsvg.dll'}
+_keep_imageformats = {'qsvg'}
 
 
 def _is_excluded(dest_name):
     name = dest_name.replace('\\', '/')
+    # Linux/macOS では Qt プラグイン等が PySide6/Qt/ 配下に置かれるため層を揃える
+    name = name.replace('PySide6/Qt/', 'PySide6/')
     if any(name.startswith(p) for p in _exclude_data_prefixes):
         return True
     if name.startswith('PySide6/plugins/imageformats/'):
-        return name.rsplit('/', 1)[-1] not in _keep_imageformats
+        # qsvg.dll (Windows) / libqsvg.so (Linux) / libqsvg.dylib (macOS)
+        stem = name.rsplit('/', 1)[-1].split('.', 1)[0]
+        if stem.startswith('lib'):
+            stem = stem[3:]
+        return stem not in _keep_imageformats
     return False
 
 
