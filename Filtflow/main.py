@@ -169,9 +169,13 @@ def main() -> None:
         """起動後のストリーム死活を監視し、停止を検出したら再接続する。
 
         _reconnecting が True の間はスキップして再試行タイマーの多重スタックを防ぐ。
+        コールバックで記録された CallbackFlags（xrun 等）のログ出力もここで行う。
         """
         if state.quitting:
             return
+        status_report = stream.consume_status_report()
+        if status_report is not None:
+            print(f"[Filtflow] {status_report}", file=sys.stderr)
         if not stream.is_active and not state.reconnecting:
             _start_stream()
         QTimer.singleShot(RECONNECT_INTERVAL_MS, _watch_stream)

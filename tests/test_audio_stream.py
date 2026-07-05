@@ -100,6 +100,48 @@ class TestAudioStreamCallback:
         assert isinstance(level_db, float)
         assert level_db <= 0.0  # 0.5 RMS → 約 -6 dB
 
+    def test_callback_counts_status(self) -> None:
+        """CallbackFlags（xrun 等）が渡されたときにカウントされることを確認。"""
+        stream = _make_stream(filter_chain=[])
+
+        indata = np.ones((480, 1), dtype=np.float32) * 0.5
+        outdata = np.zeros((480, 1), dtype=np.float32)
+
+        assert stream.status_count == 0
+        stream._callback(indata, outdata, 480, None, "input_underflow")
+        assert stream.status_count == 1
+        stream._callback(indata, outdata, 480, None, "input_underflow")
+        assert stream.status_count == 2
+        # status が偽値のときはカウントされない
+        stream._callback(indata, outdata, 480, None, None)
+        assert stream.status_count == 2
+
+    def test_consume_status_report(self) -> None:
+        """未報告の status がある間だけレポートが返り、消費後は None になることを確認。"""
+        stream = _make_stream(filter_chain=[])
+
+        indata = np.ones((480, 1), dtype=np.float32) * 0.5
+        outdata = np.zeros((480, 1), dtype=np.float32)
+
+        # status 未発生時は None
+        assert stream.consume_status_report() is None
+
+        stream._callback(indata, outdata, 480, None, "input_underflow")
+        stream._callback(indata, outdata, 480, None, "output_underflow")
+
+        report = stream.consume_status_report()
+        assert report is not None
+        assert "output_underflow" in report
+        assert "2" in report
+
+        # 消費後は新規発生がない限り None
+        assert stream.consume_status_report() is None
+
+        stream._callback(indata, outdata, 480, None, "input_underflow")
+        report = stream.consume_status_report()
+        assert report is not None
+        assert "input_underflow" in report
+
     def test_start_without_input_device_raises(self) -> None:
         """入力デバイス未設定で start() すると RuntimeError。"""
         stream = _make_stream(input_device=None)
