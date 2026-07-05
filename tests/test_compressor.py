@@ -129,18 +129,29 @@ class TestCompressor:
             out = comp.process(frame)
             np.testing.assert_allclose(out.flatten(), expected, rtol=1e-6, atol=1e-9)
 
-    def test_multichannel_envelope_isolation(self) -> None:
-        """ステレオ処理時にチャンネル間でエンベロープ状態が混ざらないことを確認。"""
+    def test_multichannel_channels_linked(self) -> None:
+        """OBS 準拠のチャンネルリンク: 全チャンネルに同一ゲインが適用されることを確認。"""
         comp_stereo = self._make_compressor()
         comp_mono = self._make_compressor()
 
-        rng = np.random.default_rng(7)
-        loud = (rng.standard_normal((480, 1)) * 0.9).astype(np.float32)
-        quiet = (rng.standard_normal((480, 1)) * 0.001).astype(np.float32)
+        loud = np.ones((480, 1), dtype=np.float32) * 0.9
+        quiet = np.ones((480, 1), dtype=np.float32) * 0.001
         stereo = np.hstack([loud, quiet])
 
         out_stereo = comp_stereo.process(stereo)
-        out_quiet_alone = comp_mono.process(quiet)
+        out_loud_alone = comp_mono.process(loud)
 
-        # 静かなチャンネルは大音量チャンネルの影響を受けず、単独処理と一致する
-        np.testing.assert_allclose(out_stereo[:, 1:2], out_quiet_alone, rtol=1e-6, atol=1e-9)
+        # エンベロープはチャンネル間 max（= loud 側）なので、
+        # loud チャンネルの出力は単独処理と一致する
+        np.testing.assert_allclose(out_stereo[:, 0:1], out_loud_alone, rtol=1e-6, atol=1e-9)
+
+        # 両チャンネルに同一のゲイン系列が適用される
+        gain_loud = out_stereo[:, 0] / loud[:, 0]
+        gain_quiet = out_stereo[:, 1] / quiet[:, 0]
+        np.testing.assert_allclose(gain_quiet, gain_loud, rtol=1e-5)
+
+        # 単独なら圧縮されない quiet チャンネルも、loud 側由来のゲインで減衰される
+        out_quiet_alone = self._make_compressor().process(quiet)
+        assert float(np.max(np.abs(out_stereo[-120:, 1]))) < float(
+            np.max(np.abs(out_quiet_alone[-120:, 0]))
+        )

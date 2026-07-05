@@ -17,6 +17,7 @@ OBS Studio の plugins/obs-filters/expander-filter.c に準拠したアルゴリ
 from __future__ import annotations
 
 import math
+from typing import TypeVar
 
 import numpy as np
 
@@ -57,9 +58,13 @@ def _gain_coefficient(sample_rate: int, time_ms: float) -> float:
     return math.exp(-1.0 / (sample_rate * time_ms / 1000.0))
 
 
-def _db_to_mul(db: float) -> float:
-    """dB 値を線形倍率に変換する。"""
-    return math.pow(10.0, db / 20.0)
+_DbT = TypeVar("_DbT", float, np.ndarray)
+
+
+def _db_to_mul(db: _DbT) -> _DbT:
+    """dB 値を線形倍率に変換する。スカラーと ndarray の両方を受け付ける。"""
+    result: _DbT = 10.0 ** (db / 20.0)
+    return result
 
 
 class Expander:
@@ -223,6 +228,6 @@ class Expander:
             )
             gain_db = self._smooth_gain(target_gain_db, ch)
 
-            out[:, ch] = samples * np.power(10.0, gain_db / 20.0) * self._output_gain
+            out[:, ch] = samples * _db_to_mul(gain_db) * self._output_gain
 
         return out.reshape(shape)

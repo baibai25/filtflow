@@ -17,6 +17,7 @@ OBS Studio の plugins/obs-filters/compressor-filter.c に準拠したアルゴ�
 from __future__ import annotations
 
 import math
+from typing import TypeVar
 
 import numpy as np
 
@@ -47,9 +48,13 @@ def _gain_coefficient(sample_rate: int, time_ms: float) -> float:
     return math.exp(-1.0 / (sample_rate * time_ms / 1000.0))
 
 
-def _db_to_mul(db: float) -> float:
-    """dB 値を線形倍率に変換する。"""
-    return math.pow(10.0, db / 20.0)
+_DbT = TypeVar("_DbT", float, np.ndarray)
+
+
+def _db_to_mul(db: _DbT) -> _DbT:
+    """dB 値を線形倍率に変換する。スカラーと ndarray の両方を受け付ける。"""
+    result: _DbT = 10.0 ** (db / 20.0)
+    return result
 
 
 class Compressor:
@@ -70,8 +75,10 @@ class Compressor:
     ) -> None:
         self._sample_rate = sample_rate
         self.enabled: bool = enabled
-        # エンベロープ検出器の状態変数（チャンネル毎に独立）
-        self._envelope: list[float] = [0.0]
+        # エンベロープ検出器の状態変数
+        # OBS 準拠で全チャンネル共有（チャンネルリンク）: チャンネル毎に追跡した
+        # エンベロープのチャンネル間 max から単一のゲインを求め、全チャンネルに適用する
+        self._envelope: float = 0.0
 
         # パラメータを設定（_slope 等の派生値も同時に計算）
         self._ratio: float = ratio
@@ -95,30 +102,43 @@ class Compressor:
         if "output_gain_db" in kwargs:
             self._output_gain = _db_to_mul(float(kwargs["output_gain_db"]))
 
-    def _analyze_envelope(self, abs_samples: np.ndarray, channel: int) -> np.ndarray:
-        """analyze_envelope: ピーク検出（1チャンネル分）。
+    def _analyze_envelope(self, abs_block: np.ndarray) -> np.ndarray:
+        """analyze_envelope: ピーク検出（チャンネルリンク）。
 
+        OBS 準拠: 各チャンネルを共通の前ブロック最終値から追跡し、
+        envelope_buf にチャンネル間 max を取る（fmaxf 相当）。
         エンベロープ追跡は係数が attack/release で切り替わる一次 IIR のため
         逐次ループが必要だが、ローカル変数キャッシュで属性参照・関数呼び出しを排除する。
+
+        Args:
+            abs_block: shape (block_size, channels) の絶対値配列。
+
+        Returns:
+            shape (block_size,) のチャンネル間 max エンベロープ。
         """
         attack = self._attack_gain
         release = self._release_gain
         inv_attack = 1.0 - attack
         inv_release = 1.0 - release
-        env = self._envelope[channel]
 
-        result: list[float] = []
-        append = result.append
-        # 上昇時は attack_gain、下降時は release_gain を使う
-        for abs_sample in abs_samples.tolist():
-            if abs_sample >= env:
-                env = attack * env + inv_attack * abs_sample
-            else:
-                env = release * env + inv_release * abs_sample
-            append(env)
+        num_samples, channels = abs_block.shape
+        envelope_buf = np.zeros(num_samples)
+        for ch in range(channels):
+            env = self._envelope
+            result: list[float] = []
+            append = result.append
+            # 上昇時は attack_gain、下降時は release_gain を使う
+            for abs_sample in abs_block[:, ch].tolist():
+                if abs_sample >= env:
+                    env = attack * env + inv_attack * abs_sample
+                else:
+                    env = release * env + inv_release * abs_sample
+                append(env)
+            envelope_buf = np.maximum(envelope_buf, result)
 
-        self._envelope[channel] = env
-        return np.asarray(result)
+        if num_samples:
+            self._envelope = float(envelope_buf[-1])
+        return envelope_buf
 
     def process(self, frame: np.ndarray) -> np.ndarray:
         """1フレーム分の音声データにコンプレッションを適用する。
@@ -134,24 +154,19 @@ class Compressor:
 
         shape = frame.shape
         block = frame.reshape(-1, 1) if frame.ndim == 1 else frame
-        channels = block.shape[1]
-        # チャンネル数が変わったらエンベロープ状態をリセット
-        if len(self._envelope) != channels:
-            self._envelope = [0.0] * channels
+        samples = block.astype(np.float64)
+        envelope = self._analyze_envelope(np.abs(samples))
 
+        # process_compression: ゲイン計算（ブロック一括のベクトル化）
+        # envelope <= 1e-10 は log10 後に threshold（>= -60 dB）を必ず下回るため gain_db = 0
+        envelope_db = 20.0 * np.log10(np.maximum(envelope, 1e-10))
+        gain_db = np.where(
+            envelope_db > self._threshold,
+            self._slope * (self._threshold - envelope_db),
+            0.0,
+        )
+
+        # 単一のゲインを全チャンネルに適用（チャンネルリンク）
         out = np.empty_like(block)
-        for ch in range(channels):
-            samples = block[:, ch].astype(np.float64)
-            envelope = self._analyze_envelope(np.abs(samples), ch)
-
-            # process_compression: ゲイン計算（ブロック一括のベクトル化）
-            # envelope <= 1e-10 は log10 後に threshold（>= -60 dB）を必ず下回るため gain_db = 0
-            envelope_db = 20.0 * np.log10(np.maximum(envelope, 1e-10))
-            gain_db = np.where(
-                envelope_db > self._threshold,
-                self._slope * (self._threshold - envelope_db),
-                0.0,
-            )
-            out[:, ch] = samples * np.power(10.0, gain_db / 20.0) * self._output_gain
-
+        out[:] = samples * _db_to_mul(gain_db)[:, np.newaxis] * self._output_gain
         return out.reshape(shape)
