@@ -83,9 +83,28 @@ _exclude_data_prefixes = (
     'PySide6/plugins/sqldrivers',
     'PySide6/plugins/designer',
     'PySide6/plugins/qmltooling',
+    'PySide6/plugins/networkinformation',    # Qt6Network 除外済みのため不要
+    'PySide6/plugins/tls',                   # 同上
+    'PySide6/plugins/generic',               # タッチ入力等、本アプリでは未使用
+    'PySide6/plugins/platforminputcontexts', # 仮想キーボード連携、未使用
     'PySide6/qml/',                # QML ファイル群
 )
-a.datas = [d for d in a.datas if not any(d[0].startswith(p) for p in _exclude_data_prefixes)]
+
+# imageformats プラグインは使用フォーマットのみ残す
+# PNG は Qt6Gui 組み込みのためプラグイン不要。qsvg は qdarktheme が使用するため除外不可
+_keep_imageformats = {'qsvg.dll'}
+
+
+def _is_excluded(dest_name):
+    name = dest_name.replace('\\', '/')
+    if any(name.startswith(p) for p in _exclude_data_prefixes):
+        return True
+    if name.startswith('PySide6/plugins/imageformats/'):
+        return name.rsplit('/', 1)[-1] not in _keep_imageformats
+    return False
+
+
+a.datas = [d for d in a.datas if not _is_excluded(d[0])]
 
 # 不要な DLL・バイナリを除去（excludes では除外しきれないもの）
 _exclude_binaries = {
@@ -105,6 +124,7 @@ _exclude_binaries = {
     'Qt6Sql.dll',
     'Qt6Xml.dll',
     'Qt6PrintSupport.dll',
+    'Qt6Pdf.dll',                   # qpdf.dll (imageformats) が依存として道連れにする
     'Qt6UiTools.dll',
     # Qt6Svg.dll — qdarktheme が使用するため除外不可
     'Qt6SvgWidgets.dll',
@@ -131,7 +151,12 @@ _exclude_binaries = {
     'Qt6QuickControls2UniversalStyleImpl.dll',
     'Qt6QuickTest.dll',
 }
-a.binaries = [b for b in a.binaries if b[1].split('\\')[-1] not in _exclude_binaries and b[1].split('/')[-1] not in _exclude_binaries]
+# プラグイン DLL は a.binaries 側に入るため、パス prefix の除外も両方に適用する
+a.binaries = [
+    b for b in a.binaries
+    if not _is_excluded(b[0])
+    and b[0].replace('\\', '/').rsplit('/', 1)[-1] not in _exclude_binaries
+]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
