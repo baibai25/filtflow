@@ -70,8 +70,8 @@ class Compressor:
     ) -> None:
         self._sample_rate = sample_rate
         self.enabled: bool = enabled
-        # エンベロープ検出器の状態変数
-        self._envelope: float = 0.0
+        # エンベロープ検出器の状態変数（チャンネル毎に独立）
+        self._envelope: list[float] = [0.0]
 
         # パラメータを設定（_slope 等の派生値も同時に計算）
         self._ratio: float = ratio
@@ -95,6 +95,31 @@ class Compressor:
         if "output_gain_db" in kwargs:
             self._output_gain = _db_to_mul(float(kwargs["output_gain_db"]))
 
+    def _analyze_envelope(self, abs_samples: np.ndarray, channel: int) -> np.ndarray:
+        """analyze_envelope: ピーク検出（1チャンネル分）。
+
+        エンベロープ追跡は係数が attack/release で切り替わる一次 IIR のため
+        逐次ループが必要だが、ローカル変数キャッシュで属性参照・関数呼び出しを排除する。
+        """
+        attack = self._attack_gain
+        release = self._release_gain
+        inv_attack = 1.0 - attack
+        inv_release = 1.0 - release
+        env = self._envelope[channel]
+
+        result: list[float] = []
+        append = result.append
+        # 上昇時は attack_gain、下降時は release_gain を使う
+        for abs_sample in abs_samples.tolist():
+            if abs_sample >= env:
+                env = attack * env + inv_attack * abs_sample
+            else:
+                env = release * env + inv_release * abs_sample
+            append(env)
+
+        self._envelope[channel] = env
+        return np.asarray(result)
+
     def process(self, frame: np.ndarray) -> np.ndarray:
         """1フレーム分の音声データにコンプレッションを適用する。
 
@@ -108,34 +133,25 @@ class Compressor:
             return frame
 
         shape = frame.shape
-        samples = frame.flatten()
-        out = np.empty_like(samples)
+        block = frame.reshape(-1, 1) if frame.ndim == 1 else frame
+        channels = block.shape[1]
+        # チャンネル数が変わったらエンベロープ状態をリセット
+        if len(self._envelope) != channels:
+            self._envelope = [0.0] * channels
 
-        for i in range(len(samples)):
-            sample = float(samples[i])
-            abs_sample = abs(sample)
+        out = np.empty_like(block)
+        for ch in range(channels):
+            samples = block[:, ch].astype(np.float64)
+            envelope = self._analyze_envelope(np.abs(samples), ch)
 
-            # analyze_envelope: ピーク検出
-            # 上昇時は attack_gain、下降時は release_gain を使う
-            if abs_sample >= self._envelope:
-                self._envelope = (
-                    self._attack_gain * self._envelope + (1.0 - self._attack_gain) * abs_sample
-                )
-            else:
-                self._envelope = (
-                    self._release_gain * self._envelope + (1.0 - self._release_gain) * abs_sample
-                )
-
-            # process_compression: ゲイン計算
-            if self._envelope > 1e-10:
-                envelope_db = 20.0 * math.log10(self._envelope)
-                if envelope_db > self._threshold:
-                    gain_db = self._slope * (self._threshold - envelope_db)
-                else:
-                    gain_db = 0.0
-            else:
-                gain_db = 0.0
-
-            out[i] = sample * _db_to_mul(gain_db) * self._output_gain
+            # process_compression: ゲイン計算（ブロック一括のベクトル化）
+            # envelope <= 1e-10 は log10 後に threshold（>= -60 dB）を必ず下回るため gain_db = 0
+            envelope_db = 20.0 * np.log10(np.maximum(envelope, 1e-10))
+            gain_db = np.where(
+                envelope_db > self._threshold,
+                self._slope * (self._threshold - envelope_db),
+                0.0,
+            )
+            out[:, ch] = samples * np.power(10.0, gain_db / 20.0) * self._output_gain
 
         return out.reshape(shape)

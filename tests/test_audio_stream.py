@@ -100,6 +100,22 @@ class TestAudioStreamCallback:
         assert isinstance(level_db, float)
         assert level_db <= 0.0  # 0.5 RMS → 約 -6 dB
 
+    def test_callback_counts_status(self) -> None:
+        """CallbackFlags（xrun 等）が渡されたときにカウントされることを確認。"""
+        stream = _make_stream(filter_chain=[])
+
+        indata = np.ones((480, 1), dtype=np.float32) * 0.5
+        outdata = np.zeros((480, 1), dtype=np.float32)
+
+        assert stream.status_count == 0
+        stream._callback(indata, outdata, 480, None, "input_underflow")
+        assert stream.status_count == 1
+        stream._callback(indata, outdata, 480, None, "input_underflow")
+        assert stream.status_count == 2
+        # status が偽値のときはカウントされない
+        stream._callback(indata, outdata, 480, None, None)
+        assert stream.status_count == 2
+
     def test_start_without_input_device_raises(self) -> None:
         """入力デバイス未設定で start() すると RuntimeError。"""
         stream = _make_stream(input_device=None)

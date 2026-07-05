@@ -7,6 +7,7 @@ sounddevice を使って WASAPI ストリームを開通し、
 from __future__ import annotations
 
 import queue
+import sys
 import threading
 from typing import Any, Callable
 
@@ -116,11 +117,17 @@ class AudioStream:
         self._stream: sd.Stream | None = None
         self._lock = threading.Lock()
         self._error: str | None = None
+        self._status_count: int = 0
 
     @property
     def error(self) -> str | None:
         """最後に発生したエラーメッセージ。正常時は None。"""
         return self._error
+
+    @property
+    def status_count(self) -> int:
+        """コールバックで CallbackFlags（xrun 等）が報告された累計回数。"""
+        return self._status_count
 
     def _callback(
         self,
@@ -132,8 +139,12 @@ class AudioStream:
     ) -> None:
         """sounddevice コールバック。リアルタイムスレッドから呼ばれる。"""
         if status:
-            # xrun 等を stderr に出力（UI 更新は行わない）
-            pass
+            # xrun 等をカウントして stderr に出力（UI 更新は行わない）
+            self._status_count += 1
+            print(
+                f"[Filtflow] audio callback status: {status} (累計 {self._status_count} 回)",
+                file=sys.stderr,
+            )
 
         audio: np.ndarray = indata.copy()
 

@@ -89,13 +89,13 @@ class Expander:
         self._preset = preset
         self._detector = detector
 
-        # RMS 検出用ランニング平均（1チャンネル分）
+        # RMS 検出用ランニング平均（チャンネル毎に独立）
         # rmscoef = exp2(-100.0 / sample_rate)
         self._rmscoef: float = math.pow(2.0, -100.0 / sample_rate)
-        self._runave: float = 0.0
+        self._runave: list[float] = [0.0]
 
-        # ゲイン平滑化の状態変数
-        self._gain_db: float = 0.0
+        # ゲイン平滑化の状態変数（チャンネル毎に独立）
+        self._gain_db: list[float] = [0.0]
 
         # パラメータ設定
         self._ratio: float = ratio
@@ -129,45 +129,56 @@ class Expander:
         if "detector" in kwargs:
             self._detector = str(kwargs["detector"])
 
-    def _detect_envelope(self, abs_sample: float) -> float:
-        """analyze_envelope: RMS またはピークでエンベロープを検出する。"""
+    def _detect_envelope(self, abs_samples: np.ndarray, channel: int) -> np.ndarray:
+        """analyze_envelope: RMS またはピークでエンベロープを検出する（1チャンネル分）。"""
         if self._detector == DETECTOR_RMS:
             # RMS 検出: ランニング平均で二乗平均を計算
-            self._runave = (
-                self._rmscoef * self._runave + (1.0 - self._rmscoef) * abs_sample * abs_sample
-            )
-            return math.sqrt(max(self._runave, 0.0))
+            # 一次 IIR のため逐次ループが必要だが、ローカル変数キャッシュで高速化する
+            rmscoef = self._rmscoef
+            inv_rmscoef = 1.0 - rmscoef
+            runave = self._runave[channel]
+
+            result: list[float] = []
+            append = result.append
+            for squared in (abs_samples * abs_samples).tolist():
+                runave = rmscoef * runave + inv_rmscoef * squared
+                append(runave)
+
+            self._runave[channel] = runave
+            env: np.ndarray = np.sqrt(np.maximum(np.asarray(result), 0.0))
+            return env
         else:
             # ピーク検出
-            return abs_sample
+            return abs_samples
 
-    def _process_sample(self, env_db: float) -> float:
-        """process_sample: ゲイン計算とアタック/リリース平滑化。
+    def _smooth_gain(self, target_gain_db: np.ndarray, channel: int) -> np.ndarray:
+        """process_sample のアタック/リリース平滑化（1チャンネル分）。
+
+        係数が attack/release で切り替わる一次 IIR のため逐次ループが必要だが、
+        ローカル変数キャッシュで属性参照・関数呼び出しを排除する。
 
         Returns:
-            平滑化後の gain_db 値。
+            平滑化後の gain_db 配列。
         """
-        # ゲイン計算
-        # slope = 1 - ratio（ratio>1 で負値）
-        # 閾値以下では (threshold - env_db) が正 → gain_db は負 = 減衰
-        if env_db < self._threshold:
-            target_gain_db = self._slope * (self._threshold - env_db)
-        else:
-            target_gain_db = 0.0
+        attack = self._attack_gain
+        release = self._release_gain
+        inv_attack = 1.0 - attack
+        inv_release = 1.0 - release
+        gain_db = self._gain_db[channel]
 
-        # アタック/リリースで平滑化
+        result: list[float] = []
+        append = result.append
         # gain_db < 前回値 (より多くの減衰へ向かう) → attack_gain で追う
         # gain_db > 前回値 (減衰から回復) → release_gain で戻す
-        if target_gain_db < self._gain_db:
-            self._gain_db = (
-                self._attack_gain * self._gain_db + (1.0 - self._attack_gain) * target_gain_db
-            )
-        else:
-            self._gain_db = (
-                self._release_gain * self._gain_db + (1.0 - self._release_gain) * target_gain_db
-            )
+        for target in target_gain_db.tolist():
+            if target < gain_db:
+                gain_db = attack * gain_db + inv_attack * target
+            else:
+                gain_db = release * gain_db + inv_release * target
+            append(gain_db)
 
-        return self._gain_db
+        self._gain_db[channel] = gain_db
+        return np.asarray(result)
 
     def process(self, frame: np.ndarray) -> np.ndarray:
         """1フレーム分の音声データにエキスパンションを適用する。
@@ -182,28 +193,36 @@ class Expander:
             return frame
 
         shape = frame.shape
-        samples = frame.flatten()
-        out = np.empty_like(samples)
+        block = frame.reshape(-1, 1) if frame.ndim == 1 else frame
+        channels = block.shape[1]
+        # チャンネル数が変わったら状態をリセット
+        if len(self._runave) != channels:
+            self._runave = [0.0] * channels
+            self._gain_db = [0.0] * channels
 
-        for i in range(len(samples)):
-            sample = float(samples[i])
-            abs_sample = abs(sample)
+        out = np.empty_like(block)
+        for ch in range(channels):
+            samples = block[:, ch].astype(np.float64)
 
             # analyze_envelope: エンベロープ検出
-            # モノラルなのでチャンネル間 max は不要だが設計通りに実装
-            env_in = self._detect_envelope(abs_sample)
+            env_in = self._detect_envelope(np.abs(samples), ch)
 
-            # envelope_buf = max(envelope_buf, env_in)  ← チャンネル間でmax
-            # モノラルなので env_in をそのまま使う
-            if env_in > 1e-10:
-                env_db = 20.0 * math.log10(env_in)
-                env_db = max(env_db, EXP_MIN_THRESHOLD_DB)
-            else:
-                env_db = EXP_MIN_THRESHOLD_DB
+            # env_in <= 1e-10 は log10 後に必ず EXP_MIN_THRESHOLD_DB を下回るためクランプで吸収
+            env_db = np.maximum(
+                20.0 * np.log10(np.maximum(env_in, 1e-10)),
+                EXP_MIN_THRESHOLD_DB,
+            )
 
-            # process_sample: ゲイン計算 + 平滑化
-            gain_db = self._process_sample(env_db)
+            # process_sample: ゲイン計算（ブロック一括のベクトル化）+ 平滑化
+            # slope = 1 - ratio（ratio>1 で負値）
+            # 閾値以下では (threshold - env_db) が正 → gain_db は負 = 減衰
+            target_gain_db = np.where(
+                env_db < self._threshold,
+                self._slope * (self._threshold - env_db),
+                0.0,
+            )
+            gain_db = self._smooth_gain(target_gain_db, ch)
 
-            out[i] = sample * _db_to_mul(gain_db) * self._output_gain
+            out[:, ch] = samples * np.power(10.0, gain_db / 20.0) * self._output_gain
 
         return out.reshape(shape)
