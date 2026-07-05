@@ -7,7 +7,6 @@ sounddevice を使って WASAPI ストリームを開通し、
 from __future__ import annotations
 
 import queue
-import sys
 import threading
 from typing import Any, Callable
 
@@ -118,6 +117,8 @@ class AudioStream:
         self._lock = threading.Lock()
         self._error: str | None = None
         self._status_count: int = 0
+        self._last_status: str = ""
+        self._reported_status_count: int = 0
 
     @property
     def error(self) -> str | None:
@@ -129,6 +130,22 @@ class AudioStream:
         """コールバックで CallbackFlags（xrun 等）が報告された累計回数。"""
         return self._status_count
 
+    def consume_status_report(self) -> str | None:
+        """前回呼び出し以降の CallbackFlags があればメッセージを返し、報告済みにする。
+
+        コールバック（リアルタイムスレッド）ではブロッキング I/O を避けるため
+        カウントのみ行い、ログ出力はメインスレッドからこのメソッド経由で行う。
+
+        Returns:
+            未報告の status があればログ用メッセージ、なければ None。
+        """
+        count = self._status_count
+        if count == self._reported_status_count:
+            return None
+        new_count = count - self._reported_status_count
+        self._reported_status_count = count
+        return f"audio callback status: {self._last_status} (新規 {new_count} 回 / 累計 {count} 回)"
+
     def _callback(
         self,
         indata: np.ndarray,
@@ -139,12 +156,10 @@ class AudioStream:
     ) -> None:
         """sounddevice コールバック。リアルタイムスレッドから呼ばれる。"""
         if status:
-            # xrun 等をカウントして stderr に出力（UI 更新は行わない）
+            # リアルタイムスレッドではブロッキング I/O を避け、記録のみ行う。
+            # ログ出力はメインスレッドが consume_status_report() で行う
+            self._last_status = str(status)
             self._status_count += 1
-            print(
-                f"[Filtflow] audio callback status: {status} (累計 {self._status_count} 回)",
-                file=sys.stderr,
-            )
 
         audio: np.ndarray = indata.copy()
 
