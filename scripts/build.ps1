@@ -25,8 +25,8 @@ New-Item -ItemType Directory -Force -Path "$StageDir\source" | Out-Null
 # 4. exe をコピー
 Copy-Item "$DistDir\Filtflow.exe" "$StageDir\"
 
-# 5. ソースコードをコピー (.claude/ を除外)
-git ls-files | Where-Object { $_ -notmatch '\.claude|\.gitignore' } | ForEach-Object {
+# 5. ソースコードをコピー (.claude/ とスクリーンショット類を除外)
+git ls-files | Where-Object { $_ -notmatch '\.claude|\.gitignore|^docs/images/' } | ForEach-Object {
     $dest = "$StageDir\source\$_"
     New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
     Copy-Item $_ $dest
