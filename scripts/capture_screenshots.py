@@ -14,14 +14,14 @@ import os
 import queue
 import sys
 
-# Filtflow パッケージのパスを通す
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Filtflow"))
+# リポジトリルートのパスを通して Filtflow パッケージを import 可能にする
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # --- audio_stream のモック ---
 # sounddevice が利用できない環境でも UI を描画できるようにする
 import types
 
-mock_audio_stream = types.ModuleType("audio_stream")
+mock_audio_stream = types.ModuleType("Filtflow.audio_stream")
 
 
 class _MockAudioStream:
@@ -55,21 +55,21 @@ mock_audio_stream.list_input_devices = _list_input_devices
 mock_audio_stream.list_output_devices = _list_output_devices
 mock_audio_stream.find_device_index = _find_device_index
 
-sys.modules["audio_stream"] = mock_audio_stream
+sys.modules["Filtflow.audio_stream"] = mock_audio_stream
 
 # --- _version のモック ---
-mock_version = types.ModuleType("_version")
+mock_version = types.ModuleType("Filtflow._version")
 mock_version.__version__ = "0.1.0"
-sys.modules["_version"] = mock_version
+sys.modules["Filtflow._version"] = mock_version
 
 # --- ここから Qt ---
+import qdarktheme
 from PySide6.QtWidgets import QApplication
 
-import qdarktheme
-from config import Config
-from compressor import Compressor
-from expander import Expander
-from ui import SettingsWindow, apply_appearance_mode
+from Filtflow.compressor import Compressor
+from Filtflow.config import Config
+from Filtflow.expander import Expander
+from Filtflow.ui import SettingsWindow, apply_appearance_mode
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "docs", "images")
 

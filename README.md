@@ -72,14 +72,19 @@ uv sync
 cd Filtflow/assets && uv run python create_icons.py && cd ../..
 
 # 起動
-uv run python Filtflow/main.py
+uv run filtflow
+# または
+uv run python -m Filtflow
 ```
 
 ### ファイル構成
 
 ```text
 Filtflow/
+├── __init__.py          パッケージ定義
+├── __main__.py          python -m Filtflow 用エントリポイント
 ├── main.py              エントリポイント・起動制御
+├── launcher.py          PyInstaller 用エントリスクリプト
 ├── audio_stream.py      デバイス列挙・WASAPI ストリーム管理
 ├── compressor.py        コンプレッサーフィルタ（OBS 準拠）
 ├── expander.py          エキスパンダーフィルタ（OBS 準拠）

@@ -70,14 +70,19 @@ uv sync
 cd Filtflow/assets && uv run python create_icons.py && cd ../..
 
 # Launch
-uv run python Filtflow/main.py
+uv run filtflow
+# or
+uv run python -m Filtflow
 ```
 
 ### File Structure
 
 ```text
 Filtflow/
+├── __init__.py          Package definition
+├── __main__.py          Entry point for python -m Filtflow
 ├── main.py              Entry point / launch control
+├── launcher.py          Entry script for PyInstaller
 ├── audio_stream.py      Device enumeration / WASAPI stream management
 ├── compressor.py        Compressor filter (OBS-based)
 ├── expander.py          Expander filter (OBS-based)
