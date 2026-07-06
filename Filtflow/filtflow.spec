@@ -4,11 +4,16 @@
 block_cipher = None
 
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    # main.py はパッケージ内相対 import を使うため直接エントリにできない。
+    # 絶対 import で起動する薄いランチャーを経由する
+    ['launcher.py'],
+    # リポジトリルートを追加して Filtflow パッケージを解決可能にする
+    pathex=['..'],
     binaries=[],
     datas=[
-        ('assets/icon.png', 'assets'),
+        # 各モジュールは Path(__file__).parent / "assets" で参照するため、
+        # frozen 時のモジュール配置 (_MEIPASS/Filtflow/) に合わせて配置する
+        ('assets/icon.png', 'Filtflow/assets'),
         ('../LICENSE', '.'),
     ],
     hiddenimports=[
