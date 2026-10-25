@@ -4,8 +4,12 @@ name: Validate PR to main - must be releases/* branched from develop
 # workflow must trigger on every PR: with a branches filter it would never report
 # a status on PRs to develop, leaving them stuck on "Expected". The job-level `if`
 # skips the check for non-main PRs, and skipped jobs satisfy required checks.
+# `edited` re-runs the check when a PR's base branch is changed (e.g. Dependabot
+# security updates always open against main and are retargeted to develop);
+# without it the stale result from the original base would remain.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
 
 jobs:
   validate-releases-branch-from-develop:
