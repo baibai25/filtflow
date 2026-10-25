@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
-from Filtflow.expander import DETECTOR_PEAK, DETECTOR_RMS, Expander
+from Filtflow.expander import (
+    DETECTOR_PEAK,
+    DETECTOR_RMS,
+    EXP_MIN_THRESHOLD_DB,
+    Expander,
+    _db_to_mul,
+)
 
 
 class TestExpander:
@@ -84,3 +92,63 @@ class TestExpander:
         assert exp._threshold == -30.0
         assert exp._detector == "peak"
         assert exp._preset == "gate"
+
+    def test_matches_scalar_reference(self) -> None:
+        """ベクトル化実装がサンプル毎のスカラー参照実装と数値一致することを確認。"""
+        for detector in (DETECTOR_RMS, DETECTOR_PEAK):
+            exp = self._make_expander(
+                threshold=-40.0, ratio=4.0, output_gain_db=2.0, detector=detector
+            )
+
+            # スカラー参照実装（ベクトル化前のアルゴリズムを忠実に再現）
+            runave = 0.0
+            gain_state = 0.0
+            rmscoef = exp._rmscoef
+            attack = exp._attack_gain
+            release = exp._release_gain
+
+            rng = np.random.default_rng(42)
+            # 複数ブロックを続けて処理し、ブロック間の状態引き継ぎも検証する
+            for _ in range(3):
+                frame = (rng.standard_normal((480, 1)) * 0.05).astype(np.float32)
+                expected = np.empty_like(frame.flatten())
+                for i, s in enumerate(frame.flatten()):
+                    sample = float(s)
+                    abs_sample = abs(sample)
+                    if detector == DETECTOR_RMS:
+                        runave = rmscoef * runave + (1.0 - rmscoef) * abs_sample * abs_sample
+                        env_in = math.sqrt(max(runave, 0.0))
+                    else:
+                        env_in = abs_sample
+                    if env_in > 1e-10:
+                        env_db = max(20.0 * math.log10(env_in), EXP_MIN_THRESHOLD_DB)
+                    else:
+                        env_db = EXP_MIN_THRESHOLD_DB
+                    if env_db < exp._threshold:
+                        target = exp._slope * (exp._threshold - env_db)
+                    else:
+                        target = 0.0
+                    if target < gain_state:
+                        gain_state = attack * gain_state + (1.0 - attack) * target
+                    else:
+                        gain_state = release * gain_state + (1.0 - release) * target
+                    expected[i] = sample * _db_to_mul(gain_state) * exp._output_gain
+
+                out = exp.process(frame)
+                np.testing.assert_allclose(out.flatten(), expected, rtol=1e-6, atol=1e-9)
+
+    def test_multichannel_state_isolation(self) -> None:
+        """ステレオ処理時にチャンネル間で状態（runave/gain_db）が混ざらないことを確認。"""
+        exp_stereo = self._make_expander(threshold=-20.0, ratio=10.0)
+        exp_mono = self._make_expander(threshold=-20.0, ratio=10.0)
+
+        rng = np.random.default_rng(7)
+        loud = (rng.standard_normal((480, 1)) * 0.9).astype(np.float32)
+        quiet = (rng.standard_normal((480, 1)) * 0.001).astype(np.float32)
+        stereo = np.hstack([loud, quiet])
+
+        out_stereo = exp_stereo.process(stereo)
+        out_quiet_alone = exp_mono.process(quiet)
+
+        # 静かなチャンネルは大音量チャンネルの影響を受けず、単独処理と一致する
+        np.testing.assert_allclose(out_stereo[:, 1:2], out_quiet_alone, rtol=1e-6, atol=1e-9)

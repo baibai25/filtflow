@@ -20,16 +20,17 @@ from pathlib import Path
 from typing import Callable
 
 import numpy as np
-from audio_stream import AudioStream, find_device_index
-from compressor import Compressor
-from config import Config
-from expander import Expander
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
-from tray import TrayIcon
-from ui import APP_VERSION, SettingsWindow, apply_appearance_mode
-from update_checker import UpdateChecker
+
+from .audio_stream import AudioStream, find_device_index
+from .compressor import Compressor
+from .config import Config
+from .expander import Expander
+from .tray import TrayIcon
+from .ui import APP_VERSION, SettingsWindow, apply_appearance_mode
+from .update_checker import UpdateChecker
 
 # レベルメーターキューの最大サイズ
 LEVEL_QUEUE_MAXSIZE: int = 16
@@ -169,9 +170,13 @@ def main() -> None:
         """起動後のストリーム死活を監視し、停止を検出したら再接続する。
 
         _reconnecting が True の間はスキップして再試行タイマーの多重スタックを防ぐ。
+        コールバックで記録された CallbackFlags（xrun 等）のログ出力もここで行う。
         """
         if state.quitting:
             return
+        status_report = stream.consume_status_report()
+        if status_report is not None:
+            print(f"[Filtflow] {status_report}", file=sys.stderr)
         if not stream.is_active and not state.reconnecting:
             _start_stream()
         QTimer.singleShot(RECONNECT_INTERVAL_MS, _watch_stream)
@@ -180,6 +185,8 @@ def main() -> None:
     update_checker = UpdateChecker()
 
     def _on_update_available(latest: str, url: str) -> None:
+        # update_available は UpdateChecker がメインスレッドで発火することを
+        # 保証しているため、クロージャ接続でも GUI 操作は安全
         state.pending_update = (latest, url)
         if settings_win is not None:
             settings_win.show_update(latest, url)

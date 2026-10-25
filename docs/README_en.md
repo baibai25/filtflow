@@ -1,12 +1,21 @@
 # Filtflow
 
-A resident tool that applies an expander and compressor in real time to any microphone input, delivering filtered audio to all applications on Windows.
+A Windows system-tray tool that applies an **expander (noise gate) and compressor** in real time to any microphone input, delivering filtered audio to all applications. Get clear, professional-quality mic audio for Discord, Teams, Zoom, and any other communication app — no OBS required.
 
 Filter algorithms are **derived from OBS Studio audio filter functionality (GPL-2.0)**.
 
 | Dark | Light |
 |:----:|:-----:|
 | ![Dark Theme](images/screenshot_dark.png) | ![Light Theme](images/screenshot_light.png) |
+
+## Features
+
+- **Real-time audio filtering** — Low-latency microphone processing via WASAPI
+- **Expander / Noise Gate** — Automatically suppress background noise, keyboard clicks, and ambient sound
+- **Compressor** — Even out volume dynamics for consistent, clear voice quality
+- **System tray resident** — Runs silently in the background; adjust settings from the notification area
+- **Works with any app** — Routes filtered audio through VB-Cable to Discord, Teams, Zoom, OBS, and more
+- **OBS-compatible parameters** — Familiar settings for anyone already using OBS Studio audio filters
 
 ## Requirements
 
@@ -61,14 +70,19 @@ uv sync
 cd Filtflow/assets && uv run python create_icons.py && cd ../..
 
 # Launch
-uv run python Filtflow/main.py
+uv run filtflow
+# or
+uv run python -m Filtflow
 ```
 
 ### File Structure
 
 ```text
 Filtflow/
+├── __init__.py          Package definition
+├── __main__.py          Entry point for python -m Filtflow
 ├── main.py              Entry point / launch control
+├── launcher.py          Entry script for PyInstaller
 ├── audio_stream.py      Device enumeration / WASAPI stream management
 ├── compressor.py        Compressor filter (OBS-based)
 ├── expander.py          Expander filter (OBS-based)

@@ -8,55 +8,10 @@ DPI スケーリングは PySide6 が自動処理するため、手動スケー�
 from __future__ import annotations
 
 import queue
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from typing import Callable
 
 import qdarktheme
-from audio_stream import (
-    AudioStream,
-    find_device_index,
-    list_input_devices,
-    list_output_devices,
-)
-from compressor import (
-    COMP_DEFAULT_ATTACK_MS,
-    COMP_DEFAULT_OUTPUT_GAIN_DB,
-    COMP_DEFAULT_RATIO,
-    COMP_DEFAULT_RELEASE_MS,
-    COMP_DEFAULT_THRESHOLD_DB,
-    COMP_MAX_ATK_MS,
-    COMP_MAX_OUTPUT_GAIN,
-    COMP_MAX_RATIO,
-    COMP_MAX_RLS_MS,
-    COMP_MIN_ATK_RLS_MS,
-    COMP_MIN_OUTPUT_GAIN,
-    COMP_MIN_RATIO,
-    COMP_MIN_THRESHOLD_DB,
-    Compressor,
-)
-from config import Config
-from expander import (
-    DETECTOR_PEAK,
-    DETECTOR_RMS,
-    EXP_DEFAULT_ATTACK_MS,
-    EXP_DEFAULT_OUTPUT_GAIN_DB,
-    EXP_DEFAULT_RATIO,
-    EXP_DEFAULT_RELEASE_MS,
-    EXP_DEFAULT_THRESHOLD_DB,
-    EXP_MAX_ATK_MS,
-    EXP_MAX_OUTPUT_GAIN,
-    EXP_MAX_RATIO,
-    EXP_MAX_RLS_MS,
-    EXP_MIN_ATK_RLS_MS,
-    EXP_MIN_OUTPUT_GAIN,
-    EXP_MIN_RATIO,
-    EXP_MIN_THRESHOLD_DB,
-    GATE_DEFAULT_RATIO,
-    GATE_DEFAULT_RELEASE_MS,
-    PRESET_EXPANDER,
-    PRESET_GATE,
-    Expander,
-)
 from PySide6.QtCore import (
     Property,
     QEasingCurve,
@@ -97,6 +52,52 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .audio_stream import (
+    AudioStream,
+    find_device_index,
+    list_input_devices,
+    list_output_devices,
+)
+from .compressor import (
+    COMP_DEFAULT_ATTACK_MS,
+    COMP_DEFAULT_OUTPUT_GAIN_DB,
+    COMP_DEFAULT_RATIO,
+    COMP_DEFAULT_RELEASE_MS,
+    COMP_DEFAULT_THRESHOLD_DB,
+    COMP_MAX_ATK_MS,
+    COMP_MAX_OUTPUT_GAIN,
+    COMP_MAX_RATIO,
+    COMP_MAX_RLS_MS,
+    COMP_MIN_ATK_RLS_MS,
+    COMP_MIN_OUTPUT_GAIN,
+    COMP_MIN_RATIO,
+    COMP_MIN_THRESHOLD_DB,
+    Compressor,
+)
+from .config import Config
+from .expander import (
+    DETECTOR_PEAK,
+    DETECTOR_RMS,
+    EXP_DEFAULT_ATTACK_MS,
+    EXP_DEFAULT_OUTPUT_GAIN_DB,
+    EXP_DEFAULT_RATIO,
+    EXP_DEFAULT_RELEASE_MS,
+    EXP_DEFAULT_THRESHOLD_DB,
+    EXP_MAX_ATK_MS,
+    EXP_MAX_OUTPUT_GAIN,
+    EXP_MAX_RATIO,
+    EXP_MAX_RLS_MS,
+    EXP_MIN_ATK_RLS_MS,
+    EXP_MIN_OUTPUT_GAIN,
+    EXP_MIN_RATIO,
+    EXP_MIN_THRESHOLD_DB,
+    GATE_DEFAULT_RATIO,
+    GATE_DEFAULT_RELEASE_MS,
+    PRESET_EXPANDER,
+    PRESET_GATE,
+    Expander,
+)
+
 # --- OBS 準拠レベルメーターの色しきい値 ---
 METER_GREEN_MAX_DB: float = -20.0  # -60 〜 -20 dBFS: 緑
 METER_YELLOW_MAX_DB: float = -9.0  # -20 〜 -9 dBFS: 黄
@@ -123,13 +124,17 @@ BLOCK_SIZE_OPTIONS: list[str] = ["128", "256", "480", "512", "960", "1024"]
 
 GITHUB_URL: str = "https://github.com/baibai25/filtflow"
 
+# ビルド時に hatch-vcs が生成する _version.py を優先し、
+# 存在しない場合（開発時の checkout 等）はインストール済みメタデータから取得する
 try:
-    from _version import __version__ as APP_VERSION
-except Exception:
+    from ._version import __version__ as _version_str
+except ImportError:
     try:
-        APP_VERSION = version("filtflow")
-    except Exception:
-        APP_VERSION = ""
+        _version_str = version("filtflow")
+    except PackageNotFoundError:
+        _version_str = ""
+
+APP_VERSION: str = _version_str
 
 # フィルタ名ラベルの無効時スタイル
 _FILTER_DISABLED_STYLE: str = "color: palette(mid); text-decoration: line-through;"

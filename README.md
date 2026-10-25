@@ -2,13 +2,22 @@
 
 [English](docs/README_en.md)
 
-任意のマイク入力にエキスパンダーとコンプレッサーをリアルタイム適用し、Windows 上の全アプリケーションにフィルタ済み音声を提供する常駐ツールです。
+任意のマイク入力に**エキスパンダー（ノイズゲート）とコンプレッサー**をリアルタイム適用し、Windows 上の全アプリケーションにフィルタ済み音声を提供する常駐ツールです。Discord・Teams・Zoom などの通話アプリで、クリアなマイク音声を手軽に実現できます。
 
 | Dark | Light |
 |:----:|:-----:|
 | ![Dark Theme](docs/images/screenshot_dark.png) | ![Light Theme](docs/images/screenshot_light.png) |
 
 フィルタアルゴリズムは **OBS Studio の音声フィルタ機能（GPL-2.0）から派生**しています。
+
+## 機能
+
+- **リアルタイム音声フィルタリング** — WASAPI による低遅延マイク処理
+- **エキスパンダー（ノイズゲート）** — 背景ノイズ・キーボード音・環境音を自動抑制
+- **コンプレッサー** — 音量の強弱を整え、安定した通話音質を実現
+- **システムトレイ常駐** — バックグラウンドで動作し、通知領域から設定変更が可能
+- **全アプリ対応** — VB-Cable 経由で Discord・Teams・Zoom・配信ソフトなど任意のアプリにフィルタ済み音声を提供
+- **OBS Studio 互換パラメータ** — OBS に慣れたユーザーも違和感なく設定可能
 
 ## 動作環境
 
@@ -63,14 +72,19 @@ uv sync
 cd Filtflow/assets && uv run python create_icons.py && cd ../..
 
 # 起動
-uv run python Filtflow/main.py
+uv run filtflow
+# または
+uv run python -m Filtflow
 ```
 
 ### ファイル構成
 
 ```text
 Filtflow/
+├── __init__.py          パッケージ定義
+├── __main__.py          python -m Filtflow 用エントリポイント
 ├── main.py              エントリポイント・起動制御
+├── launcher.py          PyInstaller 用エントリスクリプト
 ├── audio_stream.py      デバイス列挙・WASAPI ストリーム管理
 ├── compressor.py        コンプレッサーフィルタ（OBS 準拠）
 ├── expander.py          エキスパンダーフィルタ（OBS 準拠）

@@ -10,7 +10,11 @@ dependencies = [
     "pyqtdarktheme>=2.1.0",
     "numpy>=2.4.4",
     "sounddevice>=0.5.5",
+    "packaging>=24.0",
 ]
+
+[project.scripts]
+filtflow = "Filtflow.main:main"
 
 [dependency-groups]
 dev = [

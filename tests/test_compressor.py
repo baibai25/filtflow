@@ -93,3 +93,65 @@ class TestCompressor:
         )
         assert comp._ratio == 2.0
         assert comp._threshold == -30.0
+
+    def test_matches_scalar_reference(self) -> None:
+        """ベクトル化実装がサンプル毎のスカラー参照実装と数値一致することを確認。"""
+        comp = self._make_compressor(threshold=-18.0, ratio=10.0, output_gain_db=3.0)
+
+        # スカラー参照実装（ベクトル化前のアルゴリズムを忠実に再現）
+        envelope = 0.0
+        attack = comp._attack_gain
+        release = comp._release_gain
+
+        rng = np.random.default_rng(42)
+        # 複数ブロックを続けて処理し、ブロック間の状態引き継ぎも検証する
+        for _ in range(3):
+            frame = (rng.standard_normal((480, 1)) * 0.5).astype(np.float32)
+            expected = np.empty_like(frame.flatten())
+            for i, s in enumerate(frame.flatten()):
+                sample = float(s)
+                abs_sample = abs(sample)
+                if abs_sample >= envelope:
+                    envelope = attack * envelope + (1.0 - attack) * abs_sample
+                else:
+                    envelope = release * envelope + (1.0 - release) * abs_sample
+                if envelope > 1e-10:
+                    envelope_db = 20.0 * math.log10(envelope)
+                    gain_db = (
+                        comp._slope * (comp._threshold - envelope_db)
+                        if envelope_db > comp._threshold
+                        else 0.0
+                    )
+                else:
+                    gain_db = 0.0
+                expected[i] = sample * _db_to_mul(gain_db) * comp._output_gain
+
+            out = comp.process(frame)
+            np.testing.assert_allclose(out.flatten(), expected, rtol=1e-6, atol=1e-9)
+
+    def test_multichannel_channels_linked(self) -> None:
+        """OBS 準拠のチャンネルリンク: 全チャンネルに同一ゲインが適用されることを確認。"""
+        comp_stereo = self._make_compressor()
+        comp_mono = self._make_compressor()
+
+        loud = np.ones((480, 1), dtype=np.float32) * 0.9
+        quiet = np.ones((480, 1), dtype=np.float32) * 0.001
+        stereo = np.hstack([loud, quiet])
+
+        out_stereo = comp_stereo.process(stereo)
+        out_loud_alone = comp_mono.process(loud)
+
+        # エンベロープはチャンネル間 max（= loud 側）なので、
+        # loud チャンネルの出力は単独処理と一致する
+        np.testing.assert_allclose(out_stereo[:, 0:1], out_loud_alone, rtol=1e-6, atol=1e-9)
+
+        # 両チャンネルに同一のゲイン系列が適用される
+        gain_loud = out_stereo[:, 0] / loud[:, 0]
+        gain_quiet = out_stereo[:, 1] / quiet[:, 0]
+        np.testing.assert_allclose(gain_quiet, gain_loud, rtol=1e-5)
+
+        # 単独なら圧縮されない quiet チャンネルも、loud 側由来のゲインで減衰される
+        out_quiet_alone = self._make_compressor().process(quiet)
+        assert float(np.max(np.abs(out_stereo[-120:, 1]))) < float(
+            np.max(np.abs(out_quiet_alone[-120:, 0]))
+        )
