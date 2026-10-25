@@ -17,14 +17,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
-try:
-    import compressor
-    import expander
-except ImportError:  # pytest などからパッケージとしてインポートされる場合
-    from Filtflow import (
-        compressor,  # type: ignore[no-redef]
-        expander,  # type: ignore[no-redef]
-    )
+from . import compressor, expander
 
 CONFIG_DIR: Path = Path(os.environ.get("APPDATA", str(Path.home()))) / "Filtflow"
 CONFIG_FILE: Path = CONFIG_DIR / "config.json"
