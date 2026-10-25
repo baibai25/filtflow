@@ -20,16 +20,17 @@ from pathlib import Path
 from typing import Callable
 
 import numpy as np
-from audio_stream import AudioStream, find_device_index
-from compressor import Compressor
-from config import Config
-from expander import Expander
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
-from tray import TrayIcon
-from ui import APP_VERSION, SettingsWindow, apply_appearance_mode
-from update_checker import UpdateChecker
+
+from .audio_stream import AudioStream, find_device_index
+from .compressor import Compressor
+from .config import Config
+from .expander import Expander
+from .tray import TrayIcon
+from .ui import APP_VERSION, SettingsWindow, apply_appearance_mode
+from .update_checker import UpdateChecker
 
 # レベルメーターキューの最大サイズ
 LEVEL_QUEUE_MAXSIZE: int = 16
