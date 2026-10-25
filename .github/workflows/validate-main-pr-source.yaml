@@ -22,9 +22,9 @@ jobs:
           fetch-depth: 0
 
       - name: Verify source is releases/* branched from develop
+        env:
+          SOURCE_BRANCH: ${{ github.head_ref }}
         run: |
-          SOURCE_BRANCH="${{ github.head_ref }}"
-
           # Check if source branch matches releases/*
           if [[ "$SOURCE_BRANCH" != releases/* ]]; then
             echo "❌ PRs to main are only allowed from releases/* branches"
